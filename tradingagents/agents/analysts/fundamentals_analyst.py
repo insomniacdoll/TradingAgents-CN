@@ -29,7 +29,18 @@ def _get_company_name_for_fundamentals(ticker: str, market_info: dict) -> str:
         str: 公司名称
     """
     try:
-        if market_info['is_china']:
+        if market_info['is_crypto']:
+            # 加密货币：使用中文名称映射
+            try:
+                from tradingagents.dataflows.interface import get_crypto_name
+                coin_name = get_crypto_name(ticker)
+                logger.info(f"✅ [基本面分析师] 成功获取加密货币名称: {ticker} -> {coin_name}")
+                return coin_name
+            except Exception as e:
+                logger.error(f"❌ [基本面分析师] 获取加密货币名称失败: {e}")
+                return f"加密货币{ticker}"
+
+        elif market_info['is_china']:
             # 中国A股：使用统一接口获取股票信息
             from tradingagents.dataflows.interface import get_china_stock_info_unified
             stock_info = get_china_stock_info_unified(ticker)
@@ -175,40 +186,77 @@ def create_fundamentals_analyst(llm, toolkit):
         logger.info(f"📊 [基本面分析师] 绑定的工具: {tool_names_debug}")
         logger.info(f"📊 [基本面分析师] 目标市场: {market_info['market_name']}")
 
-        # 统一的系统提示，适用于所有股票类型
-        system_message = (
-            f"你是一位专业的股票基本面分析师。"
-            f"⚠️ 绝对强制要求：你必须调用工具获取真实数据！不允许任何假设或编造！"
-            f"任务：分析{company_name}（股票代码：{ticker}，{market_info['market_name']}）"
-            f"🔴 立即调用 get_stock_fundamentals_unified 工具"
-            f"参数：ticker='{ticker}', start_date='{start_date}', end_date='{current_date}', curr_date='{current_date}'"
-            "📊 分析要求："
-            "- 基于真实数据进行深度基本面分析"
-            f"- 计算并提供合理价位区间（使用{market_info['currency_name']}{market_info['currency_symbol']}）"
-            "- 分析当前股价是否被低估或高估"
-            "- 提供基于基本面的目标价位建议"
-            "- 包含PE、PB、PEG等估值指标分析"
-            "- 结合市场特点进行分析"
-            "🌍 语言和货币要求："
-            "- 所有分析内容必须使用中文"
-            "- 投资建议必须使用中文：买入、持有、卖出"
-            "- 绝对不允许使用英文：buy、hold、sell"
-            f"- 货币单位使用：{market_info['currency_name']}（{market_info['currency_symbol']}）"
-            "🚫 严格禁止："
-            "- 不允许说'我将调用工具'"
-            "- 不允许假设任何数据"
-            "- 不允许编造公司信息"
-            "- 不允许直接回答而不调用工具"
-            "- 不允许回复'无法确定价位'或'需要更多信息'"
-            "- 不允许使用英文投资建议（buy/hold/sell）"
-            "✅ 你必须："
-            "- 立即调用统一基本面分析工具"
-            "- 等待工具返回真实数据"
-            "- 基于真实数据进行分析"
-            "- 提供具体的价位区间和目标价"
-            "- 使用中文投资建议（买入/持有/卖出）"
-            "现在立即开始调用工具！不要说任何其他话！"
-        )
+        # 根据市场类型调整系统提示
+        if market_info['is_crypto']:
+            # 加密货币：使用专门的中文prompt
+            system_message = (
+                f"你是一位专业的加密货币基本面分析师。"
+                f"⚠️ 绝对强制要求：你必须调用工具获取真实数据！不允许任何假设或编造！"
+                f"任务：分析{company_name}（代码：{ticker}，加密货币）"
+                f"🔴 立即调用 get_stock_fundamentals_unified 工具"
+                f"参数：ticker='{ticker}', start_date='{start_date}', end_date='{current_date}', curr_date='{current_date}'"
+                "📊 加密货币分析要求："
+                "- 基于真实数据进行深度基本面分析"
+                f"- 计算并提供合理价位区间（使用{market_info['currency_name']}{market_info['currency_symbol']}）"
+                "- 分析当前价格是否被低估或高估"
+                "- 提供基于基本面的目标价位建议"
+                "- 包含市值、流通量、交易量等指标分析"
+                "- 分析区块链网络活跃度和生态系统发展"
+                "🌍 语言和货币要求："
+                "- 所有分析内容必须使用中文"
+                "- 投资建议必须使用中文：买入、持有、卖出"
+                "- 绝对不允许使用英文：buy、hold、sell"
+                f"- 货币单位使用：{market_info['currency_name']}（{market_info['currency_symbol']}）"
+                "🚫 严格禁止："
+                "- 不允许说'我将调用工具'"
+                "- 不允许假设任何数据"
+                "- 不允许编造加密货币信息"
+                "- 不允许直接回答而不调用工具"
+                "- 不允许回复'无法确定价位'或'需要更多信息'"
+                "- 不允许使用英文投资建议（buy/hold/sell）"
+                "✅ 你必须："
+                "- 立即调用统一基本面分析工具"
+                "- 等待工具返回真实数据"
+                "- 基于真实数据进行分析"
+                "- 提供具体的价位区间和目标价"
+                "- 使用中文投资建议（买入/持有/卖出）"
+                "现在立即开始调用工具！不要说任何其他话！"
+            )
+        else:
+            # 股票：使用统一的系统提示
+            system_message = (
+                f"你是一位专业的股票基本面分析师。"
+                f"⚠️ 绝对强制要求：你必须调用工具获取真实数据！不允许任何假设或编造！"
+                f"任务：分析{company_name}（股票代码：{ticker}，{market_info['market_name']}）"
+                f"🔴 立即调用 get_stock_fundamentals_unified 工具"
+                f"参数：ticker='{ticker}', start_date='{start_date}', end_date='{current_date}', curr_date='{current_date}'"
+                "📊 分析要求："
+                "- 基于真实数据进行深度基本面分析"
+                f"- 计算并提供合理价位区间（使用{market_info['currency_name']}{market_info['currency_symbol']}）"
+                "- 分析当前股价是否被低估或高估"
+                "- 提供基于基本面的目标价位建议"
+                "- 包含PE、PB、PEG等估值指标分析"
+                "- 结合市场特点进行分析"
+                "🌍 语言和货币要求："
+                "- 所有分析内容必须使用中文"
+                "- 投资建议必须使用中文：买入、持有、卖出"
+                "- 绝对不允许使用英文：buy、hold、sell"
+                f"- 货币单位使用：{market_info['currency_name']}（{market_info['currency_symbol']}）"
+                "🚫 严格禁止："
+                "- 不允许说'我将调用工具'"
+                "- 不允许假设任何数据"
+                "- 不允许编造公司信息"
+                "- 不允许直接回答而不调用工具"
+                "- 不允许回复'无法确定价位'或'需要更多信息'"
+                "- 不允许使用英文投资建议（buy/hold/sell）"
+                "✅ 你必须："
+                "- 立即调用统一基本面分析工具"
+                "- 等待工具返回真实数据"
+                "- 基于真实数据进行分析"
+                "- 提供具体的价位区间和目标价"
+                "- 使用中文投资建议（买入/持有/卖出）"
+                "现在立即开始调用工具！不要说任何其他话！"
+            )
 
         # 系统提示模板
         system_prompt = (

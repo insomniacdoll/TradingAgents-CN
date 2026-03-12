@@ -1943,3 +1943,217 @@ def get_stock_data_by_market(symbol: str, start_date: str = None, end_date: str 
     except Exception as e:
         logger.error(f"❌ 获取股票数据失败: {e}")
         return f"❌ 获取股票{symbol}数据失败: {e}"
+
+
+# ==================== 加密货币数据源 ====================
+
+# 导入Crypto Provider
+try:
+    from .providers.crypto.crypto_provider import CryptoProvider, CRYPTO_SYMBOL_MAPPING, CRYPTO_NAMES
+    CRYPTO_PROVIDER_AVAILABLE = True
+    logger.info("✅ 加密货币数据提供器已加载")
+except ImportError as e:
+    logger.warning(f"⚠️ Crypto Provider不可用: {e}")
+    CRYPTO_PROVIDER_AVAILABLE = False
+    CryptoProvider = None
+    CRYPTO_SYMBOL_MAPPING = {}
+    CRYPTO_NAMES = {}
+
+
+def _run_async(coro):
+    """
+    Helper function to run async code in both sync and async contexts
+
+    Args:
+        coro: Coroutine to run
+
+    Returns:
+        Result of the coroutine
+    """
+    import asyncio
+
+    try:
+        # Try to get running event loop
+        loop = asyncio.get_running_loop()
+        # If there's a running loop, we need to create a task
+        import concurrent.futures
+        # This is a sync context calling async code
+        # We need to run in a new loop since we can't await
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(asyncio.run, coro)
+            return future.result()
+    except RuntimeError:
+        # No running loop, use asyncio.run
+        return asyncio.run(coro)
+
+
+def is_crypto_symbol(symbol: str) -> bool:
+    """
+    检测符号是否为加密货币
+
+    Args:
+        symbol: 股票/加密货币符号
+
+    Returns:
+        bool: 是否为加密货币
+    """
+    if not symbol:
+        return False
+
+    symbol_upper = str(symbol).strip().upper()
+    return symbol_upper in CRYPTO_SYMBOL_MAPPING
+
+
+def get_crypto_name(ticker: str) -> str:
+    """
+    获取加密货币中文名称
+
+    Args:
+        ticker: 加密货币代码
+
+    Returns:
+        str: 加密货币中文名称
+    """
+    return CRYPTO_NAMES.get(ticker.upper(), f"加密货币{ticker}")
+
+
+def get_crypto_market_data(symbol: str) -> str:
+    """
+    获取加密货币市场数据
+
+    Args:
+        symbol: 加密货币代码
+
+    Returns:
+        str: 格式化的市场数据
+    """
+    if not CRYPTO_PROVIDER_AVAILABLE:
+        return "错误：加密货币数据提供器不可用"
+
+    try:
+        async def _get_data():
+            provider = CryptoProvider()
+            await provider.connect()
+            info = await provider.get_stock_basic_info(symbol)
+            if not info:
+                return None
+            return info
+
+        info = _run_async(_get_data())
+        if not info:
+            return f"错误：无法获取 {symbol} 的市场数据"
+
+        result = f"## {symbol.upper()} 当前市场数据:\n\n"
+        result += f"- **名称**: {info.get('name', 'N/A')}\n"
+        result += f"- **当前价格**: ${info.get('current_price', 0):,.2f}\n"
+        result += f"- **市值**: ${info.get('market_cap', 0):,.0f}\n"
+        result += f"- **24h成交量**: ${info.get('total_volume', 0):,.0f}\n"
+        result += f"- **52周最高**: ${info.get('ath', 0):,.2f}\n"
+        result += f"- **52周最低**: ${info.get('atl', 0):,.2f}\n"
+        result += f"- **数据来源**: {info.get('data_source', 'unknown')}\n"
+        return result
+    except Exception as e:
+        return f"获取加密货币市场数据失败: {str(e)}"
+
+
+def get_crypto_price_data(symbol: str, start_date: str, end_date: str) -> str:
+    """
+    获取加密货币历史价格数据
+
+    Args:
+        symbol: 加密货币代码
+        start_date: 开始日期，格式：YYYY-MM-DD
+        end_date: 结束日期，格式：YYYY-MM-DD
+
+    Returns:
+        str: 格式化的价格数据
+    """
+    if not CRYPTO_PROVIDER_AVAILABLE:
+        return "错误：加密货币数据提供器不可用"
+
+    try:
+        async def _get_data():
+            provider = CryptoProvider()
+            await provider.connect()
+            df = await provider.get_historical_data(symbol, start_date, end_date)
+            return df
+
+        df = _run_async(_get_data())
+
+        if df is None or df.empty:
+            return f"错误：无法获取 {symbol} 的价格数据"
+
+        result = f"## {symbol.upper()} 价格数据 ({start_date} 至 {end_date}):\n\n"
+        result += "| 日期 | 收盘价 | 成交量 |\n"
+        result += "|------|--------|--------|\n"
+
+        # yfinance 返回的列名是大写的，使用 Close 和 Volume
+        for idx, row in df.tail(30).iterrows():
+            close_price = row.get('Close', row.get('close', 0))
+            volume = row.get('Volume', row.get('volume', 0))
+            result += f"| {idx} | ${close_price:,.2f} | ${volume:,.0f} |\n"
+
+        return result
+    except Exception as e:
+        return f"获取加密货币价格数据失败: {str(e)}"
+
+
+def get_crypto_technical_indicators(symbol: str, curr_date: str, look_back_days: int = 30) -> str:
+    """
+    获取加密货币技术分析数据
+
+    Args:
+        symbol: 加密货币代码
+        curr_date: 当前日期，格式：YYYY-MM-DD
+        look_back_days: 回溯天数
+
+    Returns:
+        str: 格式化的技术分析数据
+    """
+    from datetime import timedelta
+
+    end_date_dt = datetime.strptime(curr_date, "%Y-%m-%d")
+    start_date_dt = end_date_dt - timedelta(days=look_back_days)
+    start_date = start_date_dt.strftime("%Y-%m-%d")
+
+    try:
+        async def _get_data():
+            provider = CryptoProvider()
+            await provider.connect()
+            df = await provider.get_historical_data(symbol, start_date, curr_date)
+            return df
+
+        df = _run_async(_get_data())
+
+        if df is None or df.empty:
+            return f"错误：无法获取 {symbol} 的技术分析数据"
+
+        # yfinance 返回的列名是大写的，使用 Close
+        close_col = 'Close' if 'Close' in df.columns else 'close'
+        prices = df[close_col].tolist()
+        current_price = prices[-1] if prices else 0
+        avg_7d = sum(prices[-7:]) / min(7, len(prices)) if len(prices) >= 7 else current_price
+        avg_30d = sum(prices) / len(prices) if prices else 0
+        high_30d = max(prices) if prices else 0
+        low_30d = min(prices) if prices else 0
+
+        result = f"## {symbol.upper()} 技术分析 (过去{look_back_days}天):\n\n"
+        result += "**价格水平：**\n"
+        result += f"- 当前价格: ${current_price:,.2f}\n"
+        result += f"- 7日均价: ${avg_7d:,.2f}\n"
+        result += f"- 30日均价: ${avg_30d:,.2f}\n"
+        result += f"- 30日最高: ${high_30d:,.2f}\n"
+        result += f"- 30日最低: ${low_30d:,.2f}\n\n"
+
+        trend_7d = "看涨" if current_price > avg_7d else "看跌"
+        trend_30d = "看涨" if current_price > avg_30d else "看跌"
+
+        result += "**趋势分析：**\n"
+        result += f"- 7日趋势: {trend_7d}\n"
+        result += f"- 30日趋势: {trend_30d}\n"
+        result += f"- 距离30日最高: {((current_price - high_30d) / high_30d * 100):+.1f}%\n"
+        result += f"- 距离30日最低: {((current_price - low_30d) / low_30d * 100):+.1f}%\n"
+
+        return result
+    except Exception as e:
+        return f"获取加密货币技术分析数据失败: {str(e)}"

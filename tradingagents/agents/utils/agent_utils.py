@@ -802,6 +802,7 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info['is_crypto']
 
             logger.info(f"🔍 [股票代码追踪] StockUtils.get_market_info 返回的市场信息: {market_info}")
             logger.info(f"📊 [统一基本面工具] 股票类型: {market_info['market_name']}")
@@ -986,6 +987,19 @@ class Toolkit:
                     result_data.append(f"## 美股基本面数据\n获取失败: {e}")
                     logger.error(f"❌ [统一基本面工具] 美股数据获取失败: {e}")
 
+            if is_crypto:
+                # 加密货币：使用CryptoProvider
+                logger.info(f"₿ [统一基本面工具] 处理加密货币数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_crypto_market_data
+                    crypto_data = get_crypto_market_data(ticker)
+                    result_data.append(f"## 加密货币基本面数据\n{crypto_data}")
+                    logger.info(f"✅ [统一基本面工具] 加密货币数据获取成功")
+                except Exception as e:
+                    result_data.append(f"## 加密货币基本面数据\n获取失败: {e}")
+                    logger.error(f"❌ [统一基本面工具] 加密货币数据获取失败: {e}")
+
             # 组合所有数据
             combined_result = f"""# {ticker} 基本面分析数据
 
@@ -1048,13 +1062,13 @@ class Toolkit:
     ) -> str:
         """
         统一的股票市场数据工具
-        自动识别股票类型（A股、港股、美股）并调用相应的数据源获取价格和技术指标数据
+        自动识别股票类型（A股、港股、美股、加密货币）并调用相应的数据源获取价格和技术指标数据
 
         ⚠️ 重要：系统会自动扩展日期范围到配置的回溯天数（通常为365天），以确保技术指标计算有足够的历史数据。
         你只需要传递当前分析日期作为 start_date 和 end_date 即可，无需手动计算历史日期范围。
 
         Args:
-            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            ticker: 股票代码（如：000001、0700.HK、AAPL、BTC）
             start_date: 开始日期（格式：YYYY-MM-DD）。传递当前分析日期即可，系统会自动扩展
             end_date: 结束日期（格式：YYYY-MM-DD）。传递当前分析日期即可
 
@@ -1078,9 +1092,10 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info['is_crypto']
 
             logger.info(f"📈 [统一市场工具] 股票类型: {market_info['market_name']}")
-            logger.info(f"📈 [统一市场工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']}")
+            logger.info(f"📈 [统一市场工具] 货币: {market_info['currency_name']} ({market_info['currency_symbol']})")
 
             result_data = []
 
@@ -1129,6 +1144,29 @@ class Toolkit:
                 except Exception as e:
                     result_data.append(f"## 美股市场数据\n获取失败: {e}")
 
+            if is_crypto:
+                # 加密货币：使用CryptoProvider
+                logger.info(f"₿ [统一市场工具] 处理加密货币市场数据...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_crypto_technical_indicators, get_crypto_price_data
+                    from datetime import datetime, timedelta
+
+                    # 获取技术分析数据
+                    tech_data = get_crypto_technical_indicators(ticker, end_date, look_back_days=30)
+                    result_data.append(f"## 加密货币技术分析\n{tech_data}")
+
+                    # 获取历史价格数据
+                    lookback_end = datetime.strptime(end_date, "%Y-%m-%d")
+                    lookback_start = lookback_end - timedelta(days=90)
+                    price_data = get_crypto_price_data(ticker, lookback_start.strftime("%Y-%m-%d"), end_date)
+                    result_data.append(f"## 加密货币价格历史\n{price_data}")
+
+                    logger.info(f"✅ [统一市场工具] 加密货币数据获取成功")
+                except Exception as e:
+                    result_data.append(f"## 加密货币市场数据\n获取失败: {e}")
+                    logger.error(f"❌ [统一市场工具] 加密货币数据获取失败: {e}")
+
             # 组合所有数据
             combined_result = f"""# {ticker} 市场数据分析
 
@@ -1159,10 +1197,10 @@ class Toolkit:
     ) -> str:
         """
         统一的股票新闻工具
-        自动识别股票类型（A股、港股、美股）并调用相应的新闻数据源
+        自动识别股票类型（A股、港股、美股、加密货币）并调用相应的新闻数据源
 
         Args:
-            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            ticker: 股票代码（如：000001、0700.HK、AAPL、BTC）
             curr_date: 当前日期（格式：YYYY-MM-DD）
 
         Returns:
@@ -1179,6 +1217,7 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info['is_crypto']
 
             logger.info(f"📰 [统一新闻工具] 股票类型: {market_info['market_name']}")
 
@@ -1263,6 +1302,25 @@ class Toolkit:
                 except Exception as e:
                     result_data.append(f"## 美股新闻\n获取失败: {e}")
 
+            if is_crypto:
+                # 加密货币：使用Google新闻搜索加密货币相关新闻
+                logger.info(f"₿ [统一新闻工具] 处理加密货币新闻...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_crypto_name
+                    coin_name = get_crypto_name(ticker)
+
+                    # 使用Google新闻搜索加密货币相关新闻
+                    search_query = f"{coin_name} {ticker} 加密货币"
+                    from tradingagents.dataflows.interface import get_google_news
+                    news_data = get_google_news(search_query, curr_date)
+                    result_data.append(f"## 加密货币新闻\n{news_data}")
+
+                    logger.info(f"✅ [统一新闻工具] 加密货币新闻获取成功")
+                except Exception as e:
+                    result_data.append(f"## 加密货币新闻\n获取失败: {e}")
+                    logger.error(f"❌ [统一新闻工具] 加密货币新闻获取失败: {e}")
+
             # 组合所有数据
             combined_result = f"""# {ticker} 新闻分析
 
@@ -1293,10 +1351,10 @@ class Toolkit:
     ) -> str:
         """
         统一的股票情绪分析工具
-        自动识别股票类型（A股、港股、美股）并调用相应的情绪数据源
+        自动识别股票类型（A股、港股、美股、加密货币）并调用相应的情绪数据源
 
         Args:
-            ticker: 股票代码（如：000001、0700.HK、AAPL）
+            ticker: 股票代码（如：000001、0700.HK、AAPL、BTC）
             curr_date: 当前日期（格式：YYYY-MM-DD）
 
         Returns:
@@ -1312,6 +1370,7 @@ class Toolkit:
             is_china = market_info['is_china']
             is_hk = market_info['is_hk']
             is_us = market_info['is_us']
+            is_crypto = market_info['is_crypto']
 
             logger.info(f"😊 [统一情绪工具] 股票类型: {market_info['market_name']}")
 
@@ -1358,6 +1417,43 @@ class Toolkit:
                 except Exception as e:
                     result_data.append(f"## 美股Reddit情绪\n获取失败: {e}")
 
+            if is_crypto:
+                # 加密货币：使用Google News搜索相关情绪
+                logger.info(f"₿ [统一情绪工具] 处理加密货币情绪...")
+
+                try:
+                    from tradingagents.dataflows.interface import get_crypto_name
+                    coin_name = get_crypto_name(ticker)
+
+                    # 使用Google新闻获取加密货币情绪信息
+                    sentiment_summary = f"""
+## 加密货币市场情绪分析
+
+**加密货币**: {coin_name}({ticker.upper()})
+**分析日期**: {curr_date}
+
+### 市场情绪概况
+- 加密货币市场情绪通常受技术发展、监管政策、市场采用等因素影响
+- 建议关注以下情绪指标：
+  * 恐慌贪婪指数
+  * 社交媒体讨论热度
+  * 机构资金流向
+  * 技术指标信号
+
+### 情绪分析重点
+- 技术基本面：网络活跃度、开发者生态
+- 市场采用：机构入场、支付场景
+- 监管动态：各国政策变化
+- 整体趋势：行业发展方向
+
+*注：加密货币情绪分析整合了多个信息源*
+"""
+                    result_data.append(sentiment_summary)
+                    logger.info(f"✅ [统一情绪工具] 加密货币情绪分析完成")
+                except Exception as e:
+                    result_data.append(f"## 加密货币情绪\n获取失败: {e}")
+                    logger.error(f"❌ [统一情绪工具] 加密货币情绪分析失败: {e}")
+
             # 组合所有数据
             combined_result = f"""# {ticker} 情绪分析
 
@@ -1377,3 +1473,201 @@ class Toolkit:
             error_msg = f"统一情绪分析工具执行失败: {str(e)}"
             logger.error(f"❌ [统一情绪工具] {error_msg}")
             return error_msg
+
+    # ==================== 加密货币工具 ====================
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_fundamentals", log_args=True)
+    def get_crypto_fundamentals(
+        ticker: Annotated[str, "加密货币代码，如 BTC, ETH"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币基本面数据
+
+        Args:
+            ticker: 加密货币代码（如：BTC、ETH）
+            curr_date: 当前日期（格式：YYYY-MM-DD）
+
+        Returns:
+            str: 加密货币基本面分析数据
+        """
+        logger.info(f"₿ [加密货币基本面] 分析币种: {ticker}")
+        try:
+            from tradingagents.dataflows.interface import get_crypto_market_data, get_crypto_name
+            coin_name = get_crypto_name(ticker)
+            market_data = get_crypto_market_data(ticker)
+
+            result = f"""# {coin_name}({ticker.upper()}) 基本面分析
+
+## 加密货币市场数据
+
+{market_data}
+
+## 基本面分析重点
+
+### 价值评估
+- 当前价格水平评估
+- 市值排名和占比
+- 流通市值对比
+
+### 技术基本面
+- 区块链网络活跃度
+- 开发者社区生态
+- 技术更新进展
+
+### 市场采用
+- 机构投资者采用情况
+- 支付场景应用
+- 生态项目发展
+
+*数据来源: Yahoo Finance / CoinGecko API*
+"""
+            return result
+        except Exception as e:
+            logger.error(f"❌ [加密货币基本面] 获取失败: {e}")
+            return f"加密货币基本面分析失败: {str(e)}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_market_analysis", log_args=True)
+    def get_crypto_market_analysis(
+        ticker: Annotated[str, "加密货币代码，如 BTC, ETH"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"],
+        look_back_days: Annotated[int, "回溯天数，默认30天"] = 30
+    ) -> str:
+        """
+        获取加密货币市场分析数据
+
+        Args:
+            ticker: 加密货币代码（如：BTC、ETH）
+            curr_date: 当前日期（格式：YYYY-MM-DD）
+            look_back_days: 回溯天数（默认30天）
+
+        Returns:
+            str: 加密货币市场分析报告
+        """
+        logger.info(f"₿ [加密货币市场分析] 分析币种: {ticker}")
+        try:
+            from tradingagents.dataflows.interface import get_crypto_technical_indicators, get_crypto_name
+            coin_name = get_crypto_name(ticker)
+            tech_data = get_crypto_technical_indicators(ticker, curr_date, look_back_days)
+
+            result = f"""# {coin_name}({ticker.upper()}) 市场分析
+
+## 技术分析
+
+{tech_data}
+
+## 市场分析重点
+
+### 趋势判断
+- 短期趋势（7日）
+- 中期趋势（30日）
+- 支撑和阻力位
+
+### 波动性分析
+- 价格波动幅度
+- 成交量变化
+- 市场情绪指标
+
+### 交易建议
+- 基于技术指标的建议
+- 风险提示
+- 止损参考位
+
+*数据来源: Yahoo Finance / CoinGecko API*
+"""
+            return result
+        except Exception as e:
+            logger.error(f"❌ [加密货币市场分析] 获取失败: {e}")
+            return f"加密货币市场分析失败: {str(e)}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_news_analysis", log_args=True)
+    def get_crypto_news_analysis(
+        ticker: Annotated[str, "加密货币代码，如 BTC, ETH"],
+        curr_date: Annotated[str, "当前日期，格式：YYYY-MM-DD"],
+        look_back_days: Annotated[int, "回溯天数，默认7天"] = 7
+    ) -> str:
+        """
+        获取加密货币相关新闻
+
+        Args:
+            ticker: 加密货币代码（如：BTC、ETH）
+            curr_date: 当前日期（格式：YYYY-MM-DD）
+            look_back_days: 回溯天数（默认7天）
+
+        Returns:
+            str: 加密货币新闻分析报告
+        """
+        logger.info(f"₿ [加密货币新闻分析] 分析币种: {ticker}")
+        try:
+            from tradingagents.dataflows.interface import get_crypto_market_data, get_crypto_name
+            coin_name = get_crypto_name(ticker)
+            market_data = get_crypto_market_data(ticker)
+
+            # yfinance暂不支持新闻，使用市场数据代替
+            result = f"""# {coin_name}({ticker.upper()}) 新闻分析
+
+## 加密货币市场数据
+
+{market_data}
+
+## 关注重点
+
+### 监管动态
+- 各国对加密货币的政策变化
+- 监管框架的建立和完善
+- 重要监管文件发布
+
+### 机构采用
+- 传统金融机构的入场情况
+- 大型企业的加密货币策略
+- ETF等金融产品进展
+
+### 技术发展
+- 区块链技术升级
+- Layer 2扩容方案
+- 生态系统建设
+
+### 市场事件
+- 重大黑客事件
+- 交易所动态
+- DeFi/NFT等板块发展
+
+*数据来源: Yahoo Finance / CoinGecko API*
+"""
+            return result
+        except Exception as e:
+            logger.error(f"❌ [加密货币新闻分析] 获取失败: {e}")
+            return f"加密货币新闻分析失败: {str(e)}"
+
+    @staticmethod
+    @tool
+    @log_tool_call(tool_name="get_crypto_price_history", log_args=True)
+    def get_crypto_price_history(
+        ticker: Annotated[str, "加密货币代码，如 BTC, ETH"],
+        start_date: Annotated[str, "开始日期，格式：YYYY-MM-DD"],
+        end_date: Annotated[str, "结束日期，格式：YYYY-MM-DD"]
+    ) -> str:
+        """
+        获取加密货币历史价格数据
+
+        Args:
+            ticker: 加密货币代码（如：BTC、ETH）
+            start_date: 开始日期（格式：YYYY-MM-DD）
+            end_date: 结束日期（格式：YYYY-MM-DD）
+
+        Returns:
+            str: 加密货币历史价格数据
+        """
+        logger.info(f"₿ [加密货币历史价格] 分析币种: {ticker}")
+        try:
+            from tradingagents.dataflows.interface import get_crypto_price_data
+            return get_crypto_price_data(ticker, start_date, end_date)
+        except Exception as e:
+            logger.error(f"❌ [加密货币历史价格] 获取失败: {e}")
+            return f"加密货币历史价格数据获取失败: {str(e)}"

@@ -41,7 +41,18 @@ def create_news_analyst(llm, toolkit):
         def _get_company_name(ticker: str, market_info: dict) -> str:
             """根据股票代码获取公司名称"""
             try:
-                if market_info['is_china']:
+                if market_info['is_crypto']:
+                    # 加密货币：使用中文名称映射
+                    try:
+                        from tradingagents.dataflows.interface import get_crypto_name
+                        coin_name = get_crypto_name(ticker)
+                        logger.info(f"✅ [新闻分析师] 成功获取加密货币名称: {ticker} -> {coin_name}")
+                        return coin_name
+                    except Exception as e:
+                        logger.error(f"❌ [新闻分析师] 获取加密货币名称失败: {e}")
+                        return f"加密货币{ticker}"
+
+                elif market_info['is_china']:
                     # 中国A股：使用统一接口获取股票信息
                     from tradingagents.dataflows.interface import get_china_stock_info_unified
                     stock_info = get_china_stock_info_unified(ticker)

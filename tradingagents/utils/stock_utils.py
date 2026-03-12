@@ -17,6 +17,7 @@ class StockMarket(Enum):
     CHINA_A = "china_a"      # 中国A股
     HONG_KONG = "hong_kong"  # 港股
     US = "us"                # 美股
+    CRYPTO = "crypto"        # 加密货币
     UNKNOWN = "unknown"      # 未知
 
 
@@ -39,6 +40,10 @@ class StockUtils:
 
         ticker = str(ticker).strip().upper()
 
+        # 加密货币：优先检测
+        if StockUtils.is_crypto_symbol(ticker):
+            return StockMarket.CRYPTO
+
         # 中国A股：6位数字
         if re.match(r'^\d{6}$', ticker):
             return StockMarket.CHINA_A
@@ -47,46 +52,92 @@ class StockUtils:
         if re.match(r'^\d{4,5}\.HK$', ticker) or re.match(r'^\d{4,5}$', ticker):
             return StockMarket.HONG_KONG
 
-        # 美股：1-5位字母
+        # 美股：1-5位字母（排除已识别的加密货币）
         if re.match(r'^[A-Z]{1,5}$', ticker):
             return StockMarket.US
 
         return StockMarket.UNKNOWN
     
     @staticmethod
+    def is_crypto_symbol(ticker: str) -> bool:
+        """
+        判断是否为加密货币
+
+        Args:
+            ticker: 加密货币代码
+
+        Returns:
+            bool: 是否为加密货币
+        """
+        if not ticker:
+            return False
+
+        ticker = str(ticker).strip().upper()
+
+        # 从interface导入crypto符号映射
+        try:
+            from tradingagents.dataflows.interface import CRYPTO_SYMBOL_MAPPING
+            return ticker in CRYPTO_SYMBOL_MAPPING
+        except ImportError:
+            # 备用白名单
+            crypto_symbols = {
+                'BTC', 'ETH', 'ADA', 'SOL', 'DOT', 'AVAX', 'MATIC', 'LINK', 'UNI', 'AAVE',
+                'XRP', 'LTC', 'BCH', 'DOGE', 'SHIB', 'PEPE', 'FLOKI', 'BNB', 'USDT', 'USDC',
+                'TON', 'ICP', 'HBAR', 'THETA', 'FIL', 'ETC', 'MKR', 'APT', 'LDO', 'OP',
+            }
+            return ticker in crypto_symbols
+
+    @staticmethod
+    def get_crypto_name(ticker: str) -> str:
+        """
+        获取加密货币中文名称
+
+        Args:
+            ticker: 加密货币代码
+
+        Returns:
+            str: 加密货币中文名称
+        """
+        try:
+            from tradingagents.dataflows.interface import CRYPTO_NAMES
+            return CRYPTO_NAMES.get(ticker.upper(), f"加密货币{ticker}")
+        except ImportError:
+            return f"加密货币{ticker}"
+
+    @staticmethod
     def is_china_stock(ticker: str) -> bool:
         """
         判断是否为中国A股
-        
+
         Args:
             ticker: 股票代码
-            
+
         Returns:
             bool: 是否为中国A股
         """
         return StockUtils.identify_stock_market(ticker) == StockMarket.CHINA_A
-    
+
     @staticmethod
     def is_hk_stock(ticker: str) -> bool:
         """
         判断是否为港股
-        
+
         Args:
             ticker: 股票代码
-            
+
         Returns:
             bool: 是否为港股
         """
         return StockUtils.identify_stock_market(ticker) == StockMarket.HONG_KONG
-    
+
     @staticmethod
     def is_us_stock(ticker: str) -> bool:
         """
         判断是否为美股
-        
+
         Args:
             ticker: 股票代码
-            
+
         Returns:
             bool: 是否为美股
         """
@@ -166,35 +217,73 @@ class StockUtils:
     def get_market_info(ticker: str) -> Dict:
         """
         获取股票市场的详细信息
-        
+
         Args:
             ticker: 股票代码
-            
+
         Returns:
             Dict: 市场信息字典
         """
         market = StockUtils.identify_stock_market(ticker)
-        currency_name, currency_symbol = StockUtils.get_currency_info(ticker)
-        data_source = StockUtils.get_data_source(ticker)
-        
-        market_names = {
-            StockMarket.CHINA_A: "中国A股",
-            StockMarket.HONG_KONG: "港股",
-            StockMarket.US: "美股",
-            StockMarket.UNKNOWN: "未知市场"
+
+        market_info_map = {
+            StockMarket.CHINA_A: {
+                'market_name': 'A股',
+                'market_code': 'CN',
+                'currency_name': '人民币',
+                'currency_symbol': '¥',
+                'is_china': True,
+                'is_hk': False,
+                'is_us': False,
+                'is_crypto': False,
+            },
+            StockMarket.HONG_KONG: {
+                'market_name': '港股',
+                'market_code': 'HK',
+                'currency_name': '港币',
+                'currency_symbol': 'HK$',
+                'is_china': False,
+                'is_hk': True,
+                'is_us': False,
+                'is_crypto': False,
+            },
+            StockMarket.US: {
+                'market_name': '美股',
+                'market_code': 'US',
+                'currency_name': '美元',
+                'currency_symbol': '$',
+                'is_china': False,
+                'is_hk': False,
+                'is_us': True,
+                'is_crypto': False,
+            },
+            StockMarket.CRYPTO: {
+                'market_name': '加密货币',
+                'market_code': 'CRYPTO',
+                'currency_name': '美元',
+                'currency_symbol': '$',
+                'is_china': False,
+                'is_hk': False,
+                'is_us': False,
+                'is_crypto': True,
+            },
+            StockMarket.UNKNOWN: {
+                'market_name': '未知',
+                'market_code': 'UNKNOWN',
+                'currency_name': '未知',
+                'currency_symbol': '',
+                'is_china': False,
+                'is_hk': False,
+                'is_us': False,
+                'is_crypto': False,
+            },
         }
-        
-        return {
-            "ticker": ticker,
-            "market": market.value,
-            "market_name": market_names[market],
-            "currency_name": currency_name,
-            "currency_symbol": currency_symbol,
-            "data_source": data_source,
-            "is_china": market == StockMarket.CHINA_A,
-            "is_hk": market == StockMarket.HONG_KONG,
-            "is_us": market == StockMarket.US
-        }
+
+        market_info = market_info_map.get(market, market_info_map[StockMarket.UNKNOWN])
+        market_info['ticker'] = ticker
+        market_info['market'] = market.value
+
+        return market_info
 
 
 # 便捷函数，保持向后兼容

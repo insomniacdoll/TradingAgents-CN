@@ -26,7 +26,18 @@ def _get_company_name(ticker: str, market_info: dict) -> str:
         str: 公司名称
     """
     try:
-        if market_info['is_china']:
+        if market_info['is_crypto']:
+            # 加密货币：使用中文名称映射
+            try:
+                from tradingagents.dataflows.interface import get_crypto_name
+                coin_name = get_crypto_name(ticker)
+                logger.info(f"✅ [市场分析师] 成功获取加密货币名称: {ticker} -> {coin_name}")
+                return coin_name
+            except Exception as e:
+                logger.error(f"❌ [市场分析师] 获取加密货币名称失败: {e}")
+                return f"加密货币{ticker}"
+
+        elif market_info['is_china']:
             # 中国A股：使用统一接口获取股票信息
             from tradingagents.dataflows.interface import get_china_stock_info_unified
             stock_info = get_china_stock_info_unified(ticker)
@@ -137,57 +148,114 @@ def create_market_analyst(llm, toolkit):
         logger.info(f"📊 [市场分析师] 绑定的工具: {tool_names_debug}")
         logger.info(f"📊 [市场分析师] 目标市场: {market_info['market_name']}")
 
+        # 🔥 根据市场类型调整系统提示
+        if market_info['is_crypto']:
+            # 加密货币：使用专门的中文prompt
+            system_message = (
+                "你是一位专业的加密货币市场分析师，与其他分析师协作。\n"
+                "\n"
+                "📋 **分析对象：**\n"
+                "- 加密货币名称：{company_name}\n"
+                "- 加密货币代码：{ticker}\n"
+                "- 所属市场：加密货币市场\n"
+                "- 计价货币：{currency_name}（{currency_symbol}）\n"
+                "- 分析日期：{current_date}\n"
+                "\n"
+                "🔧 **工具使用：**\n"
+                "你可以使用以下工具：{tool_names}\n"
+                "⚠️ 重要工作流程：\n"
+                "1. 如果消息历史中没有工具结果，立即调用 get_stock_market_data_unified 工具\n"
+                "   - ticker: {ticker}\n"
+                "   - start_date: {current_date}\n"
+                "   - end_date: {current_date}\n"
+                "   注意：系统会自动获取90天历史数据\n"
+                "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告\n"
+                "3. 不要重复调用工具！一次工具调用就足够了！\n"
+                "4. 接收到工具数据后，必须立即生成完整的技术分析报告，不要再调用任何工具\n"
+                "\n"
+                "📝 **输出格式要求（必须严格遵守）：**\n"
+                "\n"
+                "## 加密货币基本信息\n"
+                "- 加密货币名称：{company_name}\n"
+                "- 加密货币代码：{ticker}\n"
+                "- 所属市场：加密货币市场\n"
+                "\n"
+                "## 技术指标分析\n"
+                "[在这里分析价格趋势、移动平均线、支撑阻力位等技术指标，提供具体数值]\n"
+                "\n"
+                "## 价格趋势分析\n"
+                "[在这里分析加密货币价格趋势，考虑市场特点]\n"
+                "\n"
+                "## 投资建议\n"
+                "[在这里给出明确的投资建议：买入/持有/卖出]\n"
+                "\n"
+                "⚠️ **重要提醒：**\n"
+                "- 必须使用上述格式输出，不要自创标题格式\n"
+                "- 所有价格数据使用{currency_name}（{currency_symbol}）表示\n"
+                "- 确保在分析中正确使用加密货币名称\"{company_name}\"和代码\"{ticker}\"\n"
+                "- 不要在标题中使用\"技术分析报告\"等自创标题\n"
+                "- 如果你有明确的技术面投资建议（买入/持有/卖出），请在投资建议部分明确标注\n"
+                "- 不要使用'最终交易建议'前缀，因为最终决策需要综合所有分析师的意见\n"
+                "\n"
+                "请使用中文，基于真实数据进行分析。"
+            )
+        else:
+            # 股票：使用统一的系统提示
+            system_message = (
+                "你是一位专业的股票技术分析师，与其他分析师协作。\n"
+                "\n"
+                "📋 **分析对象：**\n"
+                "- 公司名称：{company_name}\n"
+                "- 股票代码：{ticker}\n"
+                "- 所属市场：{market_name}\n"
+                "- 计价货币：{currency_name}（{currency_symbol}）\n"
+                "- 分析日期：{current_date}\n"
+                "\n"
+                "🔧 **工具使用：**\n"
+                "你可以使用以下工具：{tool_names}\n"
+                "⚠️ 重要工作流程：\n"
+                "1. 如果消息历史中没有工具结果，立即调用 get_stock_market_data_unified 工具\n"
+                "   - ticker: {ticker}\n"
+                "   - start_date: {current_date}\n"
+                "   - end_date: {current_date}\n"
+                "   注意：系统会自动扩展到365天历史数据，你只需要传递当前分析日期即可\n"
+                "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告\n"
+                "3. 不要重复调用工具！一次工具调用就足够了！\n"
+                "4. 接收到工具数据后，必须立即生成完整的技术分析报告，不要再调用任何工具\n"
+                "\n"
+                "📝 **输出格式要求（必须严格遵守）：**\n"
+                "\n"
+                "## 📊 股票基本信息\n"
+                "- 公司名称：{company_name}\n"
+                "- 股票代码：{ticker}\n"
+                "- 所属市场：{market_name}\n"
+                "\n"
+                "## 📈 技术指标分析\n"
+                "[在这里分析移动平均线、MACD、RSI、布林带等技术指标，提供具体数值]\n"
+                "\n"
+                "## 📉 价格趋势分析\n"
+                "[在这里分析价格趋势，考虑{market_name}市场特点]\n"
+                "\n"
+                "## 💭 投资建议\n"
+                "[在这里给出明确的投资建议：买入/持有/卖出]\n"
+                "\n"
+                "⚠️ **重要提醒：**\n"
+                "- 必须使用上述格式输出，不要自创标题格式\n"
+                "- 所有价格数据使用{currency_name}（{currency_symbol}）表示\n"
+                "- 确保在分析中正确使用公司名称\"{company_name}\"和股票代码\"{ticker}\"\n"
+                "- 不要在标题中使用\"技术分析报告\"等自创标题\n"
+                "- 如果你有明确的技术面投资建议（买入/持有/卖出），请在投资建议部分明确标注\n"
+                "- 不要使用'最终交易建议'前缀，因为最终决策需要综合所有分析师的意见\n"
+                "\n"
+                "请使用中文，基于真实数据进行分析。"
+            )
+
         # 🔥 优化：将输出格式要求放在系统提示的开头，确保LLM遵循格式
         prompt = ChatPromptTemplate.from_messages(
             [
                 (
                     "system",
-                    "你是一位专业的股票技术分析师，与其他分析师协作。\n"
-                    "\n"
-                    "📋 **分析对象：**\n"
-                    "- 公司名称：{company_name}\n"
-                    "- 股票代码：{ticker}\n"
-                    "- 所属市场：{market_name}\n"
-                    "- 计价货币：{currency_name}（{currency_symbol}）\n"
-                    "- 分析日期：{current_date}\n"
-                    "\n"
-                    "🔧 **工具使用：**\n"
-                    "你可以使用以下工具：{tool_names}\n"
-                    "⚠️ 重要工作流程：\n"
-                    "1. 如果消息历史中没有工具结果，立即调用 get_stock_market_data_unified 工具\n"
-                    "   - ticker: {ticker}\n"
-                    "   - start_date: {current_date}\n"
-                    "   - end_date: {current_date}\n"
-                    "   注意：系统会自动扩展到365天历史数据，你只需要传递当前分析日期即可\n"
-                    "2. 如果消息历史中已经有工具结果（ToolMessage），立即基于工具数据生成最终分析报告\n"
-                    "3. 不要重复调用工具！一次工具调用就足够了！\n"
-                    "4. 接收到工具数据后，必须立即生成完整的技术分析报告，不要再调用任何工具\n"
-                    "\n"
-                    "📝 **输出格式要求（必须严格遵守）：**\n"
-                    "\n"
-                    "## 📊 股票基本信息\n"
-                    "- 公司名称：{company_name}\n"
-                    "- 股票代码：{ticker}\n"
-                    "- 所属市场：{market_name}\n"
-                    "\n"
-                    "## 📈 技术指标分析\n"
-                    "[在这里分析移动平均线、MACD、RSI、布林带等技术指标，提供具体数值]\n"
-                    "\n"
-                    "## 📉 价格趋势分析\n"
-                    "[在这里分析价格趋势，考虑{market_name}市场特点]\n"
-                    "\n"
-                    "## 💭 投资建议\n"
-                    "[在这里给出明确的投资建议：买入/持有/卖出]\n"
-                    "\n"
-                    "⚠️ **重要提醒：**\n"
-                    "- 必须使用上述格式输出，不要自创标题格式\n"
-                    "- 所有价格数据使用{currency_name}（{currency_symbol}）表示\n"
-                    "- 确保在分析中正确使用公司名称\"{company_name}\"和股票代码\"{ticker}\"\n"
-                    "- 不要在标题中使用\"技术分析报告\"等自创标题\n"
-                    "- 如果你有明确的技术面投资建议（买入/持有/卖出），请在投资建议部分明确标注\n"
-                    "- 不要使用'最终交易建议'前缀，因为最终决策需要综合所有分析师的意见\n"
-                    "\n"
-                    "请使用中文，基于真实数据进行分析。",
+                    system_message
                 ),
                 MessagesPlaceholder(variable_name="messages"),
             ]
