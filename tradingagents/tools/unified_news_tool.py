@@ -43,7 +43,9 @@ class UnifiedNewsAnalyzer:
         logger.info(f"[统一新闻工具] 股票类型: {stock_type}")
         
         # 根据股票类型调用相应的获取方法
-        if stock_type == "A股":
+        if stock_type == "加密货币":
+            result = self._get_crypto_news(stock_code, max_news, model_info)
+        elif stock_type == "A股":
             result = self._get_a_share_news(stock_code, max_news, model_info)
         elif stock_type == "港股":
             result = self._get_hk_share_news(stock_code, max_news, model_info)
@@ -67,25 +69,30 @@ class UnifiedNewsAnalyzer:
     def _identify_stock_type(self, stock_code: str) -> str:
         """识别股票类型"""
         stock_code = stock_code.upper().strip()
-        
+
+        # 加密货币判断（优先）
+        from tradingagents.dataflows.interface import is_crypto_symbol
+        if is_crypto_symbol(stock_code):
+            return "加密货币"
+
         # A股判断
         if re.match(r'^(00|30|60|68)\d{4}$', stock_code):
             return "A股"
         elif re.match(r'^(SZ|SH)\d{6}$', stock_code):
             return "A股"
-        
+
         # 港股判断
         elif re.match(r'^\d{4,5}\.HK$', stock_code):
             return "港股"
         elif re.match(r'^\d{4,5}$', stock_code) and len(stock_code) <= 5:
             return "港股"
-        
+
         # 美股判断
         elif re.match(r'^[A-Z]{1,5}$', stock_code):
             return "美股"
         elif '.' in stock_code and not stock_code.endswith('.HK'):
             return "美股"
-        
+
         # 默认按A股处理
         else:
             return "A股"
@@ -455,7 +462,83 @@ class UnifiedNewsAnalyzer:
             logger.warning(f"[统一新闻工具] FinnHub美股新闻获取失败: {e}")
         
         return "❌ 无法获取美股新闻数据，所有新闻源均不可用"
-    
+
+    def _get_crypto_news(self, stock_code: str, max_news: int, model_info: str = "") -> str:
+        """获取加密货币新闻"""
+        logger.info(f"[统一新闻工具] 获取加密货币 {stock_code} 新闻")
+        curr_date = datetime.now().strftime("%Y-%m-%d")
+
+        # 获取加密货币名称
+        coin_name = stock_code
+        try:
+            from tradingagents.dataflows.interface import get_crypto_name
+            coin_name = get_crypto_name(stock_code)
+        except Exception as e:
+            logger.warning(f"[统一新闻工具] 获取加密货币名称失败: {e}")
+
+        # 优先级1: CoinGecko 趋势和市场数据
+        try:
+            logger.info(f"[统一新闻工具] 尝试获取 CoinGecko 市场数据: {coin_name}")
+            from tradingagents.dataflows.interface import CRYPTO_PROVIDER_AVAILABLE
+            if CRYPTO_PROVIDER_AVAILABLE:
+                from tradingagents.dataflows.interface import _run_async
+                from tradingagents.dataflows.providers.crypto.crypto_provider import CryptoProvider
+
+                async def get_coingecko_data():
+                    provider = CryptoProvider()
+                    await provider.connect()
+                    # 获取市场概览
+                    from tradingagents.dataflows.interface import get_crypto_market_data
+                    market_data = get_crypto_market_data(stock_code)
+                    return market_data
+
+                coingecko_data = _run_async(get_coingecko_data())
+                if coingecko_data and len(coingecko_data) > 100:
+                    logger.info(f"[统一新闻工具] ✅ CoinGecko 数据获取成功")
+                    # 继续获取Google新闻作为补充
+                else:
+                    logger.warning(f"[统一新闻工具] ⚠️ CoinGecko 数据获取失败")
+                    coingecko_data = ""
+            else:
+                logger.warning(f"[统一新闻工具] ⚠️ CRYPTO_PROVIDER_AVAILABLE is False")
+                coingecko_data = ""
+        except Exception as e:
+            logger.warning(f"[统一新闻工具] CoinGecko 数据获取失败: {e}")
+            coingecko_data = ""
+
+        # 优先级2: Google News（加密货币搜索）
+        try:
+            if hasattr(self.toolkit, 'get_google_news'):
+                logger.info(f"[统一新闻工具] 尝试 Google 加密货币新闻...")
+                # 使用加密货币相关的搜索关键词
+                query = f"{stock_code} {coin_name} 加密货币 crypto blockchain 新闻"
+                result = self.toolkit.get_google_news.invoke({"query": query, "curr_date": curr_date})
+                if result and len(result.strip()) > 50:
+                    logger.info(f"[统一新闻工具] ✅ Google 加密货币新闻获取成功")
+                    return self._format_crypto_news_result(result, "Google新闻", model_info)
+        except Exception as e:
+            logger.warning(f"[统一新闻工具] Google 加密货币新闻获取失败: {e}")
+
+        return f"❌ 无法获取 {stock_code} 的加密货币新闻数据"
+
+    def _format_crypto_news_result(self, news_content: str, source: str, model_info: str = "") -> str:
+        """格式化加密货币新闻结果"""
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        formatted_result = f"""
+=== 📰 加密货币新闻数据来源: {source} ===
+获取时间: {timestamp}
+数据长度: {len(news_content)} 字符
+
+=== 📋 新闻内容 ===
+{news_content}
+
+=== ✅ 数据状态 ===
+状态: 成功获取
+来源: {source}
+"""
+        return formatted_result.strip()
+
     def _format_news_result(self, news_content: str, source: str, model_info: str = "") -> str:
         """格式化新闻结果"""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -576,13 +659,14 @@ def create_unified_news_tool(toolkit):
 统一新闻获取工具 - 根据股票代码自动获取相应市场的新闻
 
 功能:
-- 自动识别股票类型（A股/港股/美股）
+- 自动识别股票类型（A股/港股/美股/加密货币）
 - 根据股票类型选择最佳新闻源
 - A股: 优先东方财富 -> Google中文 -> OpenAI
 - 港股: 优先Google -> OpenAI -> 实时新闻
 - 美股: 优先OpenAI -> Google英文 -> FinnHub
+- 加密货币: 优先CoinGecko市场数据 -> Google加密货币新闻
 - 返回格式化的新闻内容
 - 支持Google模型的特殊长度控制
 """
-    
+
     return get_stock_news_unified

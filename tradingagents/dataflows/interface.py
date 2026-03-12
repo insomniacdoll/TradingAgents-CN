@@ -2157,3 +2157,71 @@ def get_crypto_technical_indicators(symbol: str, curr_date: str, look_back_days:
         return result
     except Exception as e:
         return f"获取加密货币技术分析数据失败: {str(e)}"
+
+
+def get_crypto_market_trends() -> str:
+    """
+    Get cryptocurrency market trends (trending coins + global market overview)
+
+    Returns:
+        str: Formatted market trends data
+    """
+    if not CRYPTO_PROVIDER_AVAILABLE:
+        return "错误：加密货币数据提供器不可用"
+
+    try:
+        async def _get_trends():
+            provider = CryptoProvider()
+            await provider.connect()
+
+            result = "## 加密货币市场趋势\n\n"
+
+            # Get trending cryptocurrencies using CoinGecko API
+            try:
+                import requests
+                coin_gecko_base = "https://api.coingecko.com/api/v3"
+                trending_url = f"{coin_gecko_base}/search/trending"
+                response = requests.get(trending_url, timeout=10)
+                if response.status_code == 200:
+                    trending_data = response.json()
+
+                    if trending_data and "coins" in trending_data:
+                        result += "**热门加密货币（过去24小时）:**\n"
+                        for coin in trending_data["coins"][:7]:
+                            item = coin.get("item", {})
+                            name = item.get('name', 'N/A')
+                            symbol = item.get('symbol', 'N/A').upper()
+                            rank = item.get('market_cap_rank', 'N/A')
+                            result += f"- {name} ({symbol}): 市值排名 #{rank}\n"
+                        result += "\n"
+            except Exception as e:
+                logger.warning(f"获取 CoinGecko 趋势失败: {e}")
+
+            # Get global market overview
+            try:
+                global_url = f"{coin_gecko_base}/global"
+                response = requests.get(global_url, timeout=10)
+                if response.status_code == 200:
+                    global_data = response.json()
+
+                    if global_data and "data" in global_data:
+                        data = global_data["data"]
+                        result += "**全球市场概览:**\n"
+                        total_market_cap = data.get('total_market_cap', {}).get('usd', 0)
+                        total_volume = data.get('total_volume', {}).get('usd', 0)
+                        btc_dominance = data.get('market_cap_percentage', {}).get('btc', 0)
+                        active_cryptos = data.get('active_cryptocurrencies', 0)
+
+                        result += f"- 总市值: ${total_market_cap:,.0f}\n"
+                        result += f"- 24小时交易量: ${total_volume:,.0f}\n"
+                        result += f"- 比特币主导率: {btc_dominance:.1f}%\n"
+                        result += f"- 活跃加密货币数量: {active_cryptos:,}\n"
+            except Exception as e:
+                logger.warning(f"获取全球市场概览失败: {e}")
+
+            return result
+
+        return _run_async(_get_trends())
+
+    except Exception as e:
+        return f"获取加密货币市场趋势失败: {str(e)}"
