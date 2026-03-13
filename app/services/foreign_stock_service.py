@@ -35,6 +35,11 @@ class ForeignStockService:
             "quote": 600,        # 10分钟
             "info": 86400,       # 1天
             "kline": 7200,       # 2小时
+        },
+        "CRYPTO": {
+            "quote": 600,        # 10分钟（实时行情）
+            "info": 86400,       # 1天（基础信息）
+            "kline": 7200,       # 2小时（K线数据）
         }
     }
 
@@ -44,6 +49,15 @@ class ForeignStockService:
 
         # 初始化港股数据源提供者
         self.hk_provider = HKStockProvider()
+
+        # 初始化加密货币数据源提供者
+        self.crypto_provider = None
+        try:
+            from tradingagents.dataflows.providers.crypto import CryptoProvider
+            self.crypto_provider = CryptoProvider()
+            logger.info("✅ 加密货币Provider初始化成功")
+        except Exception as e:
+            logger.warning(f"⚠️ 加密货币Provider初始化失败: {e}")
 
         # 保存数据库连接（用于查询数据源优先级）
         self.db = db
@@ -59,15 +73,15 @@ class ForeignStockService:
     async def get_quote(self, market: str, code: str, force_refresh: bool = False) -> Dict:
         """
         获取实时行情
-        
+
         Args:
-            market: 市场类型 (HK/US)
-            code: 股票代码
+            market: 市场类型 (HK/US/CRYPTO)
+            code: 股票/加密货币代码
             force_refresh: 是否强制刷新（跳过缓存）
-        
+
         Returns:
             实时行情数据
-        
+
         流程：
         1. 检查是否强制刷新
         2. 从缓存获取（Redis → MongoDB → File）
@@ -78,18 +92,20 @@ class ForeignStockService:
             return await self._get_hk_quote(code, force_refresh)
         elif market == 'US':
             return await self._get_us_quote(code, force_refresh)
+        elif market == 'CRYPTO':
+            return await self._get_crypto_quote(code, force_refresh)
         else:
             raise ValueError(f"不支持的市场类型: {market}")
     
     async def get_basic_info(self, market: str, code: str, force_refresh: bool = False) -> Dict:
         """
         获取基础信息
-        
+
         Args:
-            market: 市场类型 (HK/US)
-            code: 股票代码
+            market: 市场类型 (HK/US/CRYPTO)
+            code: 股票/加密货币代码
             force_refresh: 是否强制刷新
-        
+
         Returns:
             基础信息数据
         """
@@ -97,21 +113,23 @@ class ForeignStockService:
             return await self._get_hk_info(code, force_refresh)
         elif market == 'US':
             return await self._get_us_info(code, force_refresh)
+        elif market == 'CRYPTO':
+            return await self._get_crypto_info(code, force_refresh)
         else:
             raise ValueError(f"不支持的市场类型: {market}")
     
-    async def get_kline(self, market: str, code: str, period: str = 'day', 
+    async def get_kline(self, market: str, code: str, period: str = 'day',
                        limit: int = 120, force_refresh: bool = False) -> List[Dict]:
         """
         获取K线数据
-        
+
         Args:
-            market: 市场类型 (HK/US)
-            code: 股票代码
+            market: 市场类型 (HK/US/CRYPTO)
+            code: 股票/加密货币代码
             period: 周期 (day/week/month)
             limit: 数据条数
             force_refresh: 是否强制刷新
-        
+
         Returns:
             K线数据列表
         """
@@ -119,6 +137,8 @@ class ForeignStockService:
             return await self._get_hk_kline(code, period, limit, force_refresh)
         elif market == 'US':
             return await self._get_us_kline(code, period, limit, force_refresh)
+        elif market == 'CRYPTO':
+            return await self._get_crypto_kline(code, period, limit, force_refresh)
         else:
             raise ValueError(f"不支持的市场类型: {market}")
     
@@ -1834,4 +1854,160 @@ class ForeignStockService:
         except Exception as e:
             logger.warning(f"⚠️ AKShare获取港股新闻失败: {e}")
             raise
+
+    # ==================== 加密货币数据获取方法 ====================
+
+    async def _get_crypto_quote(self, code: str, force_refresh: bool = False) -> Dict:
+        """
+        获取加密货币实时行情（带请求去重）
+        🔥 按照港股/美股统一的模式调用API
+        🔥 防止并发请求重复调用API
+        """
+        # 1. 检查缓存（除非强制刷新）
+        if not force_refresh:
+            cache_key = self.cache.find_cached_stock_data(
+                symbol=code,
+                data_source="crypto_realtime_quote"
+            )
+
+            if cache_key:
+                cached_data = self.cache.load_stock_data(cache_key)
+                if cached_data:
+                    logger.info(f"⚡ 从缓存获取加密货币行情: {code}")
+                    return self._parse_cached_data(cached_data, 'CRYPTO', code)
+
+        # 2. 🔥 请求去重：使用锁确保同一加密货币同时只有一个API调用
+        request_key = f"CRYPTO_quote_{code}_{force_refresh}"
+        lock = self._request_locks[request_key]
+
+        async with lock:
+            # 🔥 再次检查缓存（可能在等待锁的过程中，其他请求已经完成并缓存了数据）
+            if not force_refresh:
+                cache_key = self.cache.find_cached_stock_data(
+                    symbol=code,
+                    data_source="crypto_realtime_quote"
+                )
+                if cache_key:
+                    cached_data = self.cache.load_stock_data(cache_key)
+                    if cached_data:
+                        logger.info(f"⚡ 从缓存获取加密货币行情（锁内）: {code}")
+                        return self._parse_cached_data(cached_data, 'CRYPTO', code)
+
+            # 🔥 检查是否有正在进行的请求（共享结果）
+            if not force_refresh and request_key in self._pending_requests:
+                logger.info(f"⏳ 等待其他请求完成: {code}")
+                return await self._pending_requests[request_key]
+
+            # 🔥 创建新请求任务
+            task = asyncio.create_task(self._fetch_crypto_quote(code))
+            self._pending_requests[request_key] = task
+
+            try:
+                result = await task
+                return result
+            finally:
+                # 清理pending请求
+                if request_key in self._pending_requests:
+                    del self._pending_requests[request_key]
+
+    async def _fetch_crypto_quote(self, code: str) -> Dict:
+        """实际获取加密货币行情数据"""
+        if not self.crypto_provider:
+            logger.warning(f"⚠️ 加密货币Provider不可用: {code}")
+            return {}
+
+        try:
+            logger.info(f"🪙 从API获取加密货币行情: {code}")
+            data = await self.crypto_provider.get_stock_quotes(code)
+
+            if data and data.get("code"):
+                # 保存到缓存
+                self.cache.save_stock_data(
+                    data,
+                    symbol=code,
+                    data_source="crypto_realtime_quote"
+                )
+                logger.info(f"✅ 加密货币行情获取成功: {code}")
+                return data
+            else:
+                logger.warning(f"⚠️ 加密货币行情数据为空: {code}")
+                return {}
+        except Exception as e:
+            logger.error(f"❌ 获取加密货币行情失败: {code}, 错误: {e}")
+            return {}
+
+    async def _get_crypto_info(self, code: str, force_refresh: bool = False) -> Dict:
+        """获取加密货币基础信息"""
+        if not force_refresh:
+            cache_key = self.cache.find_cached_stock_data(
+                symbol=code,
+                data_source="crypto_basic_info"
+            )
+
+            if cache_key:
+                cached_data = self.cache.load_stock_data(cache_key)
+                if cached_data:
+                    logger.info(f"⚡ 从缓存获取加密货币信息: {code}")
+                    return self._parse_cached_data(cached_data, 'CRYPTO', code)
+
+        if not self.crypto_provider:
+            logger.warning(f"⚠️ 加密货币Provider不可用: {code}")
+            return {}
+
+        try:
+            logger.info(f"🪙 从API获取加密货币信息: {code}")
+            data = await self.crypto_provider.get_stock_basic_info(code)
+
+            if data and data.get("code"):
+                self.cache.save_stock_data(
+                    data,
+                    symbol=code,
+                    data_source="crypto_basic_info"
+                )
+                logger.info(f"✅ 加密货币信息获取成功: {code}")
+                return data
+            else:
+                logger.warning(f"⚠️ 加密货币信息数据为空: {code}")
+                return {}
+        except Exception as e:
+            logger.error(f"❌ 获取加密货币信息失败: {code}, 错误: {e}")
+            return {}
+
+    async def _get_crypto_kline(
+        self,
+        code: str,
+        period: str = 'day',
+        limit: int = 120,
+        force_refresh: bool = False
+    ) -> List[Dict]:
+        """获取加密货币K线数据"""
+        if not self.crypto_provider:
+            logger.warning(f"⚠️ 加密货币Provider不可用: {code}")
+            return []
+
+        try:
+            from datetime import datetime, timedelta, date
+
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=limit)
+
+            logger.info(f"🪙 获取加密货币K线数据: {code}, {start_date} 到 {end_date}")
+
+            df = await self.crypto_provider.get_historical_data(
+                code,
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d")
+            )
+
+            if df is not None and not df.empty:
+                # 转换为字典列表
+                result = df.to_dict('records')
+                logger.info(f"✅ 加密货币K线数据获取成功: {code}, {len(result)}条")
+                return result
+            else:
+                logger.warning(f"⚠️ 加密货币K线数据为空: {code}")
+                return []
+        except Exception as e:
+            logger.error(f"❌ 获取加密货币K线失败: {code}, 错误: {e}")
+            return []
 

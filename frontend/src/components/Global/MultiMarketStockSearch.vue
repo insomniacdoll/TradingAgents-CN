@@ -77,7 +77,8 @@ const getPlaceholder = () => {
   const placeholders: Record<string, string> = {
     CN: '输入股票代码或名称（如：000001 或 平安银行）',
     HK: '输入股票代码或名称（如：00700 或 腾讯）',
-    US: '输入股票代码或名称（如：AAPL 或 Apple）'
+    US: '输入股票代码或名称（如：AAPL 或 Apple）',
+    CRYPTO: '输入加密货币代码（如：BTC 或 Bitcoin）'
   }
   return placeholders[selectedMarket.value] || '输入股票代码或名称'
 }
@@ -86,7 +87,8 @@ const getMarketLabel = (market: string) => {
   const labels: Record<string, string> = {
     CN: 'A股',
     HK: '港股',
-    US: '美股'
+    US: '美股',
+    CRYPTO: '加密货币'
   }
   return labels[market] || market
 }
@@ -95,6 +97,10 @@ const formatStockCode = (stock: StockInfo) => {
   if (stock.market === 'HK') {
     // 港股代码格式化为5位（如：00700）
     return stock.code.padStart(5, '0')
+  }
+  if (stock.market === 'CRYPTO') {
+    // 加密货币代码不需要特殊格式化
+    return stock.code
   }
   return stock.code
 }

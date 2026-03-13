@@ -51,7 +51,15 @@ class USDataSource(Enum):
     FINNHUB = DataSourceCode.FINNHUB  # Finnhub（备用数据源）
 
 
+class CryptoDataSource(Enum):
+    """
+    加密货币数据源枚举
 
+    注意：这个枚举与 tradingagents.constants.DataSourceCode 保持同步
+    值使用统一的数据源编码
+    """
+    MONGODB = DataSourceCode.MONGODB  # MongoDB数据库缓存（最高优先级）
+    COINGECKO = DataSourceCode.COINGECKO  # CoinGecko API
 
 
 class DataSourceManager:

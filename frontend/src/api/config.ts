@@ -496,6 +496,9 @@ export const DATA_SOURCE_TYPES = {
   ALPHA_VANTAGE: 'alpha_vantage',
   IEX_CLOUD: 'iex_cloud',
 
+  // 加密货币数据源
+  COINGECKO: 'coingecko',
+
   // 专业数据源
   WIND: 'wind',
   CHOICE: 'choice',
@@ -560,8 +563,8 @@ export const DEFAULT_MARKET_CATEGORIES: Partial<MarketCategory>[] = [
   {
     id: 'crypto',
     name: 'crypto',
-    display_name: '数字货币',
-    description: '数字货币市场数据源',
+    display_name: '加密货币',
+    description: '加密货币市场数据源',
     enabled: true,
     sort_order: 4
   },

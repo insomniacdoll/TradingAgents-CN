@@ -41,7 +41,10 @@ class DataSourceCode(str, Enum):
     
     # ==================== 港股数据源 ====================
     # 注意：AKShare 也支持港股，已在上面定义
-    
+
+    # ==================== 加密货币数据源 ====================
+    COINGECKO = "coingecko"       # CoinGecko - 加密货币数据
+
     # ==================== 专业数据源 ====================
     WIND = "wind"        # Wind 万得 - 专业金融终端
     CHOICE = "choice"    # 东方财富 Choice - 专业金融数据
@@ -205,7 +208,22 @@ DATA_SOURCE_REGISTRY: Dict[str, DataSourceInfo] = {
         documentation_url="https://iexcloud.io/docs/api",
         features=["实时行情", "历史数据", "财务数据", "新闻资讯"],
     ),
-    
+
+    # CoinGecko
+    DataSourceCode.COINGECKO: DataSourceInfo(
+        code=DataSourceCode.COINGECKO,
+        name="CoinGecko",
+        display_name="CoinGecko",
+        provider="CoinGecko",
+        description="领先的加密货币数据平台，提供全面的加密货币市场数据",
+        supported_markets=["crypto"],
+        requires_api_key=False,  # 免费API无需密钥，付费版可选
+        is_free=True,  # 有免费版
+        official_website="https://www.coingecko.com",
+        documentation_url="https://www.coingecko.com/en/api",
+        features=["实时行情", "历史数据", "市场数据", "去中心化交易所数据", "完全免费"],
+    ),
+
     # Wind
     DataSourceCode.WIND: DataSourceInfo(
         code=DataSourceCode.WIND,

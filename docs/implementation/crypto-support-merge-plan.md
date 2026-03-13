@@ -23,169 +23,500 @@
 
 ## 二、合并方案
 
-### 阶段1：核心数据层
+### 阶段1：核心数据层 ✅ 已完成
 
 **1.1 新增CoinGecko数据提供者**
-- 创建 `tradingagents/dataflows/providers/crypto/coingecko_provider.py`
-- 实现统一的provider接口（参考现有US/HK provider）
-- 封装CoinGecko API调用，支持缓存和错误处理
-- 支持中英文数据格式
+- ✅ 创建 `tradingagents/dataflows/providers/crypto/coingecko_provider.py`
+- ✅ 实现统一的provider接口（参考现有US/HK provider）
+- ✅ 封装CoinGecko API调用，支持缓存和错误处理
+- ✅ 支持中英文数据格式
 
 **1.2 更新interface.py**
-- 导入CoinGecko工具函数
-- 添加符号类型检测函数 `is_crypto_symbol(symbol: str) -> bool`
-- 添加crypto符号白名单（BTC、ETH等）
-- 保持向后兼容，不影响现有股票/港股功能
+- ✅ 导入CoinGecko工具函数
+- ✅ 添加符号类型检测函数 `is_crypto_symbol(symbol: str) -> bool`
+- ✅ 添加crypto符号白名单（BTC、ETH等）
+- ✅ 保持向后兼容，不影响现有股票/港股功能
 
-### 阶段2：分析师层（中文Prompt）
+### 阶段2：分析师层（中文Prompt） ✅ 已完成
 
 **2.1 修改分析师文件**
-- 在每个分析师中添加crypto检测逻辑
-- 根据符号类型选择不同的工具集
-- **将crypto相关的prompt全部改为中文**
-- 保持现有股票/港股功能不变
+- ✅ 在每个分析师中添加crypto检测逻辑
+- ✅ 根据符号类型选择不同的工具集
+- ✅ **将crypto相关的prompt全部改为中文**
+- ✅ 保持现有股票/港股功能不变
 
 **具体改动：**
 
 **fundamentals_analyst.py**
-- 添加crypto基本面工具
-- **中文prompt内容：**
+- ✅ 添加crypto基本面工具
+- ✅ **中文prompt内容：**
   - 加密货币基本面分析师
   - 分析市值、供应量、代币经济学、网络指标、采用指标等
   - 生成中文报告
 
 **market_analyst.py**
-- 添加crypto技术分析工具
-- **中文prompt内容：**
+- ✅ 添加crypto技术分析工具
+- ✅ **中文prompt内容：**
   - 加密货币技术分析师
   - 分析价格走势、成交量、支撑阻力位、波动性等
   - 生成中文报告
 
 **news_analyst.py**
-- 添加crypto新闻工具
-- **中文prompt内容：**
+- ✅ 添加crypto新闻工具
+- ✅ **中文prompt内容：**
   - 加密货币新闻研究员
   - 分析加密货币市场相关新闻、监管动态、机构采用等
   - 生成中文报告
 
-### 阶段3：前端修改
+### 阶段3：前端修改 ✅ 已完成
 
 **3.1 类型定义更新**
-- 修改 `frontend/src/types/analysis.ts`
-- 将 `market_type` 类型扩展为：
+- ✅ 修改 `frontend/src/types/analysis.ts`
+- ✅ 将 `market_type` 类型扩展为：
   ```typescript
   market_type: 'A股' | '美股' | '港股' | '加密货币'
   ```
 
 **3.2 代码验证工具更新**
-- 修改 `frontend/src/utils/stockValidator.ts`
-- 新增 `validateCrypto()` 函数
-- 更新 `validateStockCode()` 函数，支持加密货币检测
-
-```typescript
-/**
- * 加密货币代码格式验证
- * 格式：2-4个大写字母
- * 示例：BTC、ETH、ADA、SOL、DOT
- */
-export function validateCrypto(code: string): StockValidationResult {
-  const cleanCode = code.trim().toUpperCase()
-
-  // 基本格式：2-4个大写字母
-  if (!/^[A-Z]{2,4}$/.test(cleanCode)) {
-    return {
-      valid: false,
-      message: '加密货币代码格式不正确（2-4个字母，如：BTC、ETH）'
-    }
-  }
-
-  // 常见加密货币白名单
-  const commonCryptos = ['BTC', 'ETH', 'ADA', 'SOL', 'DOT', 'AVAX', 'MATIC', 'LINK', 'UNI', 'AAVE',
-                         'XRP', 'LTC', 'BCH', 'EOS', 'TRX', 'XLM', 'VET', 'ALGO', 'ATOM', 'LUNA',
-                         'NEAR', 'FTM', 'CRO', 'SAND', 'MANA', 'AXS', 'GALA', 'ENJ', 'CHZ', 'BAT',
-                         'ZEC', 'DASH', 'XMR', 'DOGE', 'SHIB', 'PEPE', 'FLOKI', 'BNB', 'USDT', 'USDC']
-
-  if (!commonCryptos.includes(cleanCode)) {
-    return {
-      valid: false,
-      message: '暂不支持该加密货币，请使用常见加密货币（如：BTC、ETH、ADA等）'
-    }
-  }
-
-  return {
-    valid: true,
-    market: '加密货币',
-    normalizedCode: cleanCode
-  }
-}
-```
+- ✅ 修改 `frontend/src/utils/stockValidator.ts`
+- ✅ 新增 `validateCrypto()` 函数
+- ✅ 更新 `validateStockCode()` 函数，支持加密货币检测
 
 **3.3 市场类型工具更新**
-- 修改 `frontend/src/utils/market.ts`
-- 更新 `normalizeMarketForAnalysis()` 函数，支持加密货币
-- 更新 `getMarketByStockCode()` 函数
-
-```typescript
-export const normalizeMarketForAnalysis = (market: any): string => {
-  const raw = String(market ?? '').trim()
-  const upper = raw.toUpperCase()
-  const cn = raw
-  const isA = [...]
-  const isHK = [...]
-  const isUS = [...]
-  const isCrypto = ['加密货币', 'CRYPTO', '数字货币'].includes(cn) || ['CRYPTO'].includes(upper)
-  if (isA) return 'A股'
-  if (isHK) return '港股'
-  if (isUS) return '美股'
-  if (isCrypto) return '加密货币'
-  return 'A股'
-}
-```
+- ✅ 修改 `frontend/src/utils/market.ts`
+- ✅ 更新 `normalizeMarketForAnalysis()` 函数，支持加密货币
+- ✅ 更新 `getMarketByStockCode()` 函数
 
 **3.4 分析页面更新**
-- 修改 `frontend/src/views/Analysis/SingleAnalysis.vue`
-- 市场类型选择器添加"加密货币"选项
-- 添加加密货币代码输入验证
-- 根据选择的动态调整输入提示
+- ✅ 修改 `frontend/src/views/Analysis/SingleAnalysis.vue`
+- ✅ 市场类型选择器添加"加密货币"选项
+- ✅ 添加加密货币代码输入验证
+- ✅ 根据选择的动态调整输入提示
 
-- 修改 `frontend/src/views/Analysis/BatchAnalysis.vue`
-- 添加加密货币批量分析支持
+- ✅ 修改 `frontend/src/views/Analysis/BatchAnalysis.vue`
+- ✅ 添加加密货币批量分析支持
 
-- 修改 `frontend/src/views/Analysis/AnalysisHistory.vue`
-- 加密货币分析结果展示
+- ✅ 修改 `frontend/src/views/Analysis/AnalysisHistory.vue`
+- ✅ 加密货币分析结果展示
 
 **3.5 股票输入组件更新**
-- 查找或创建股票代码输入组件
-- 添加加密货币代码检测逻辑
-- 根据检测结果自动切换市场类型
+- ✅ 查找或创建股票代码输入组件
+- ✅ 添加加密货币代码检测逻辑
+- ✅ 根据检测结果自动切换市场类型
 
 **3.6 配置页面更新**
-- 修改 `frontend/src/views/Settings/` 下的配置页面
-- 添加CoinGecko API密钥配置选项（可选）
-- 添加加密货币数据源开关配置
+- ✅ 修改 `frontend/src/views/Settings/` 下的配置页面
+- ✅ 添加CoinGecko API密钥配置选项（可选）
+- ✅ 添加加密货币数据源开关配置
 
-### 阶段4：配置与依赖
+### 阶段4：配置与依赖 ✅ 已完成
 
 **4.1 环境配置**
-- 在 `.env.example` 添加 `COINGECKO_API_KEY` 配置项（可选）
-- 在数据库配置中添加crypto市场类别选项
+- ✅ 在 `.env.example` 添加 `COINGECKO_API_KEY` 配置项（可选）
+- ✅ 在数据库配置中添加crypto市场类别选项
 
 **4.2 依赖管理**
-- `requests` 已存在于 `requirements.txt`，无需额外添加
+- ✅ `requests` 已存在于 `requirements.txt`，无需额外添加
 
 **4.3 数据源配置**
-- 在数据库配置中添加crypto市场类别选项
-- 支持用户启用/禁用crypto数据源
+- ✅ 在数据库配置中添加crypto市场类别选项
+- ✅ 支持用户启用/禁用crypto数据源
 
-### 阶段5：后端API更新
+### 阶段5：后端API更新 ✅ 已完成
 
-**5.1 API路由更新**
-- 添加加密货币符号验证端点
-- 支持加密货币分析请求
+**5.1 更新数据模型**
 
-**5.2 数据库模型更新**
-- 支持存储加密货币分析结果
-- 更新历史记录查询，支持加密货币过滤
+**5.1.1 修改 `app/models/stock_models.py`**
+
+将 `MarketType` 枚举扩展以支持加密货币：
+
+```python
+# 枚举类型定义（更新前）
+MarketType = Literal["CN", "HK", "US"]  # 市场类型
+
+# 枚举类型定义（更新后）
+MarketType = Literal["CN", "HK", "US", "CRYPTO"]  # 市场类型
+```
+
+更新 `MarketInfo` 类，添加加密货币交易所：
+
+```python
+ExchangeType = Literal["SZSE", "SSE", "SEHK", "NYSE", "NASDAQ", "COINGECKO"]  # 交易所
+CurrencyType = Literal["CNY", "HKD", "USD", "USDT", "BTC", "ETH"]  # 货币类型
+```
+
+更新 `StockBasicInfoExtended` 和 `MarketQuotesExtended` 的 `symbol` 字段验证，移除仅限6位数字的限制：
+
+```python
+# 更新前
+symbol: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+
+# 更新后
+symbol: str = Field(..., description="股票/加密货币代码")
+```
+
+**5.1.2 修改 `app/models/analysis.py`**
+
+更新 `AnalysisParameters` 类，确保 `market_type` 字段支持加密货币：
+
+```python
+# 确保类型定义支持
+market_type: str = "A股"  # 默认值
+# 可选值: "A股", "美股", "港股", "加密货币"
+```
+
+**5.2 添加加密货币验证端点**
+
+**5.2.1 创建 `app/routers/crypto.py`**
+
+新建加密货币专用路由文件：
+
+```python
+"""
+加密货币相关API路由
+"""
+
+from typing import Dict, Any, List
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
+
+from app.routers.auth_db import get_current_user
+from app.core.response import ok
+import logging
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/crypto", tags=["加密货币"])
+
+
+# 支持的加密货币白名单
+SUPPORTED_CRYPTOS = [
+    "BTC", "ETH", "ADA", "SOL", "DOT", "AVAX", "MATIC", "LINK", "UNI", "AAVE",
+    "XRP", "LTC", "BCH", "EOS", "TRX", "XLM", "VET", "ALGO", "ATOM", "LUNA",
+    "NEAR", "FTM", "CRO", "SAND", "MANA", "AXS", "GALA", "ENJ", "CHZ", "BAT",
+    "ZEC", "DASH", "XMR", "DOGE", "SHIB", "PEPE", "FLOKI", "BNB", "USDT", "USDC",
+    "DAI", "WBTC", "COMP", "MKR", "SNX", "YFI", "CRV", "SUSHI", "1INCH", "REN",
+    "AVALANCHE", "POLYGON", "CHAINLINK", "UNISWAP", "AAVE", "CARDCANO", "BITCOIN", "ETHEREUM"
+]
+
+
+class CryptoValidationRequest(BaseModel):
+    """加密货币验证请求"""
+    code: str = Field(..., description="加密货币代码")
+
+
+class CryptoValidationResponse(BaseModel):
+    """加密货币验证响应"""
+    valid: bool
+    code: str
+    message: str
+    market_type: str = "加密货币"
+
+
+class CryptoInfoResponse(BaseModel):
+    """加密货币信息响应"""
+    code: str
+    name: str
+    symbol: str
+    market_type: str = "加密货币"
+
+
+@router.get("/supported", response_model=List[Dict[str, Any]])
+async def get_supported_cryptos(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取支持的加密货币列表
+
+    返回所有支持的加密货币代码和基本信息
+    """
+    return ok(data=[
+        {"code": crypto, "name": crypto}
+        for crypto in SUPPORTED_CRYPTOS
+    ])
+
+
+@router.post("/validate", response_model=CryptoValidationResponse)
+async def validate_crypto_code(
+    request: CryptoValidationRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    验证加密货币代码
+
+    检查加密货币代码格式和是否在支持列表中
+    """
+    # 标准化代码
+    code = request.code.strip().upper()
+
+    # 基本格式验证（2-4个大写字母）
+    import re
+    if not re.match(r'^[A-Z]{2,4}$', code):
+        return CryptoValidationResponse(
+            valid=False,
+            code=code,
+            message=f"加密货币代码格式不正确（2-4个字母，如：BTC、ETH）",
+            market_type="加密货币"
+        )
+
+    # 检查是否在支持列表中
+    if code not in SUPPORTED_CRYPTOS:
+        return CryptoValidationResponse(
+            valid=False,
+            code=code,
+            message=f"暂不支持该加密货币，请使用常见加密货币（如：BTC、ETH、ADA等）",
+            market_type="加密货币"
+        )
+
+    # 通过验证
+    return CryptoValidationResponse(
+        valid=True,
+        code=code,
+        message="验证通过",
+        market_type="加密货币"
+    )
+
+
+@router.get("/{code}/info", response_model=Dict[str, Any])
+async def get_crypto_info(
+    code: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取加密货币基本信息
+
+    从CoinGecko获取加密货币的基础信息
+    """
+    # 标准化代码
+    code = code.strip().upper()
+
+    # 验证代码
+    if code not in SUPPORTED_CRYPTOS:
+        raise HTTPException(status_code=400, detail="不支持的加密货币代码")
+
+    try:
+        # 调用CoinGecko Provider
+        from tradingagents.dataflows.providers.crypto.coingecko_provider import CoinGeckoProvider
+
+        provider = CoinGeckoProvider()
+        info = provider.get_crypto_basic_info(code)
+
+        if not info:
+            raise HTTPException(status_code=404, detail=f"未找到加密货币信息: {code}")
+
+        return ok(data={
+            "code": code,
+            "name": info.get("name", code),
+            "symbol": info.get("symbol", code),
+            "market_type": "加密货币",
+            "market_cap": info.get("market_cap"),
+            "price": info.get("current_price"),
+            "change_percent_24h": info.get("price_change_percentage_24h"),
+            "total_supply": info.get("total_supply"),
+            "circulating_supply": info.get("circulating_supply")
+        })
+    except Exception as e:
+        logger.error(f"获取加密货币信息失败: {e}")
+        raise HTTPException(status_code=500, detail=f"获取加密货币信息失败: {str(e)}")
+```
+
+**5.3 更新 `app/routers/stocks.py`**
+
+在 `_detect_market_and_code` 函数中添加加密货币检测逻辑：
+
+```python
+def _detect_market_and_code(code: str) -> Tuple[str, str]:
+    """
+    检测股票代码的市场类型并标准化代码
+
+    Args:
+        code: 股票/加密货币代码
+
+    Returns:
+        (market, normalized_code): 市场类型和标准化后的代码
+            - CN: A股（6位数字）
+            - HK: 港股（4-5位数字或带.HK后缀）
+            - US: 美股（字母代码，4-5位）
+            - CRYPTO: 加密货币（2-4位大写字母）
+    """
+    code = code.strip().upper()
+
+    # 加密货币：2-4位大写字母，且在白名单中
+    import re
+    if re.match(r'^[A-Z]{2,4}$', code):
+        # 导入支持的加密货币列表
+        from app.routers.crypto import SUPPORTED_CRYPTOS
+        if code in SUPPORTED_CRYPTOS:
+            return ('CRYPTO', code)
+
+    # 港股：带.HK后缀
+    if code.endswith('.HK'):
+        return ('HK', code[:-3].zfill(5))  # 移除.HK，补齐到5位
+
+    # 美股：纯字母（4-5位，排除加密货币）
+    if re.match(r'^[A-Z]{4,5}$', code):
+        return ('US', code)
+
+    # 港股：4-5位数字
+    if re.match(r'^\d{4,5}$', code):
+        return ('HK', code.zfill(5))  # 补齐到5位
+
+    # A股：6位数字
+    if re.match(r'^\d{6}$', code):
+        return ('CN', code)
+
+    # 默认当作A股处理
+    return ('CN', _zfill_code(code))
+```
+
+在 `get_quote` 端点中添加加密货币支持：
+
+```python
+@router.get("/{code}/quote", response_model=dict)
+async def get_quote(
+    code: str,
+    force_refresh: bool = Query(False, description="是否强制刷新（跳过缓存）"),
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取股票/加密货币实时行情（支持A股/港股/美股/加密货币）
+
+    自动识别市场类型：
+    - 6位数字 → A股
+    - 4位数字或.HK → 港股
+    - 4-5位字母（非加密货币）→ 美股
+    - 2-4位字母（加密货币白名单）→ 加密货币
+
+    参数：
+    - code: 股票/加密货币代码
+    - force_refresh: 是否强制刷新（跳过缓存）
+    """
+    # 检测市场类型
+    market, normalized_code = _detect_market_and_code(code)
+
+    # 加密货币：使用CoinGecko Provider
+    if market == 'CRYPTO':
+        from tradingagents.dataflows.providers.crypto.coingecko_provider import CoinGeckoProvider
+
+        try:
+            provider = CoinGeckoProvider()
+            quote_data = provider.get_current_price(normalized_code, "usd")
+
+            if not quote_data:
+                return ok(data=None, message=f"未找到加密货币行情: {code}")
+
+            return ok(data={
+                "code": normalized_code,
+                "name": quote_data.get("name", normalized_code),
+                "market": "CRYPTO",
+                "market_type": "加密货币",
+                "price": quote_data.get("usd"),
+                "price_usd": quote_data.get("usd"),
+                "change_percent_24h": quote_data.get("usd_24h_change"),
+                "last_updated": quote_data.get("last_updated_at"),
+                "currency": "USD"
+            })
+        except Exception as e:
+            logger.error(f"获取加密货币行情失败: {e}")
+            return ok(data=None, message=f"获取加密货币行情失败: {str(e)}")
+
+    # 港股和美股：使用新服务
+    if market in ['HK', 'US']:
+        # ... 现有港股和美股逻辑 ...
+
+    # A股：现有逻辑
+    # ... 现有A股逻辑 ...
+```
+
+**5.4 更新 `app/routers/analysis.py`**
+
+在单股分析提交端点中添加加密货币符号检测：
+
+```python
+@router.post("/single", response_model=Dict[str, Any])
+async def submit_single_analysis(
+    request: SingleAnalysisRequest,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user)
+):
+    """提交单股/加密货币分析任务 - 使用 BackgroundTasks 异步执行"""
+    try:
+        logger.info(f"🎯 收到分析请求")
+        logger.info(f"👤 用户信息: {user}")
+        logger.info(f"📊 请求数据: {request}")
+
+        # 自动检测加密货币符号
+        symbol = request.get_symbol()
+        if symbol:
+            from app.routers.stocks import _detect_market_and_code
+            market, _ = _detect_market_and_code(symbol)
+
+            # 如果检测到是加密货币，自动设置市场类型
+            if market == 'CRYPTO':
+                if not request.parameters:
+                    request.parameters = AnalysisParameters()
+                request.parameters.market_type = "加密货币"
+                logger.info(f"🪙 检测到加密货币符号: {symbol}")
+
+        # ... 其余现有逻辑 ...
+```
+
+**5.5 更新 `app/main.py`**
+
+注册新的加密货币路由：
+
+```python
+from app.routers import crypto
+
+# 在现有路由注册后添加
+app.include_router(crypto.router)
+```
+
+**5.6 数据库查询更新**
+
+在历史查询路由中，确保支持按 `market_type = "加密货币"` 过滤：
+
+```python
+@router.get("/user/history")
+async def get_user_analysis_history(
+    # ... 现有参数 ...
+    market_type: Optional[str] = Query(None, description="市场类型: A股/美股/港股/加密货币"),
+    # ... 现有参数 ...
+):
+    """获取用户分析历史（支持基础筛选与分页，包含加密货币）"""
+    # ... 现有逻辑 ...
+    # 市场类型过滤（已有支持，确认支持"加密货币"值）
+    if market_type:
+        params = x.get("parameters") or {}
+        if params.get("market_type") != market_type:
+            continue
+    # ...
+```
+
+**5.7 配置页面更新**
+
+在配置路由中添加CoinGecko配置显示：
+
+```python
+# 在 app/routers/config.py 中
+
+@router.get("/crypto", response_model=Dict[str, Any])
+async def get_crypto_config(
+    current_user: dict = Depends(get_current_user)
+):
+    """获取加密货币数据源配置"""
+    from app.core.config import get_settings
+
+    settings = get_settings()
+
+    return ok(data={
+        "coingecko_api_key_configured": bool(settings.COINGECKO_API_KEY),
+        "crypto_data_source_enabled": settings.CRYPTO_DATA_SOURCE_ENABLED,
+        "crypto_data_cache_hours": settings.CRYPTO_DATA_CACHE_HOURS
+    })
+```
+
+---
 
 ### 阶段6：测试与文档
 

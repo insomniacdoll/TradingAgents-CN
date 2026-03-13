@@ -2292,3 +2292,48 @@ async def delete_database_config(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"删除数据库配置失败: {str(e)}"
         )
+
+
+@router.get("/crypto", response_model=Dict[str, Any])
+async def get_crypto_config(
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    获取加密货币数据源配置
+
+    返回加密货币数据源的可用状态和配置信息
+    """
+    try:
+        from app.core.config import get_settings
+        settings = get_settings()
+
+        # 检查provider是否可用
+        provider_available = False
+        provider_name = None
+        try:
+            from tradingagents.dataflows.providers.crypto import CRYPTO_PROVIDER_AVAILABLE, CryptoProvider
+            provider_available = CRYPTO_PROVIDER_AVAILABLE
+            if provider_available:
+                provider = CryptoProvider()
+                # 判断主要数据源
+                provider_name = "yfinance" if provider.yf_available else "CoinGecko"
+        except Exception as e:
+            logger.warning(f"检查加密货币provider失败: {e}")
+
+        return ok(data={
+            "provider_available": provider_available,
+            "provider_name": provider_name,
+            "coingecko_api_key_configured": bool(settings.COINGECKO_API_KEY),
+            "crypto_data_source_enabled": settings.CRYPTO_DATA_SOURCE_ENABLED,
+            "crypto_data_cache_hours": settings.CRYPTO_DATA_CACHE_HOURS,
+            "supported_cryptos": [
+                "BTC", "ETH", "ADA", "SOL", "DOT", "AVAX", "MATIC", "LINK", "UNI", "AAVE",
+                "XRP", "LTC", "BCH", "DOGE", "SHIB", "PEPE", "BNB", "USDT", "USDC"
+            ]
+        })
+    except Exception as e:
+        logger.error(f"❌ 获取加密货币配置失败: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取加密货币配置失败: {str(e)}"
+        )

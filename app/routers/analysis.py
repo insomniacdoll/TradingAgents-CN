@@ -43,11 +43,24 @@ async def submit_single_analysis(
     background_tasks: BackgroundTasks,
     user: dict = Depends(get_current_user)
 ):
-    """提交单股分析任务 - 使用 BackgroundTasks 异步执行"""
+    """提交单股/加密货币分析任务 - 使用 BackgroundTasks 异步执行"""
     try:
-        logger.info(f"🎯 收到单股分析请求")
+        logger.info(f"🎯 收到分析请求")
         logger.info(f"👤 用户信息: {user}")
         logger.info(f"📊 请求数据: {request}")
+
+        # 🔥 自动检测加密货币符号
+        symbol = request.get_symbol()
+        if symbol:
+            from app.routers.stocks import _detect_market_and_code
+            market, _ = _detect_market_and_code(symbol)
+
+            # 如果检测到是加密货币，自动设置市场类型
+            if market == 'CRYPTO':
+                if not request.parameters:
+                    request.parameters = AnalysisParameters()
+                request.parameters.market_type = "加密货币"
+                logger.info(f"🪙 检测到加密货币符号: {symbol}")
 
         # 立即创建任务记录并返回，不等待执行完成
         analysis_service = get_simple_analysis_service()

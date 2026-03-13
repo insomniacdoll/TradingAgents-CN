@@ -33,22 +33,32 @@ def _detect_market_and_code(code: str) -> Tuple[str, str]:
     检测股票代码的市场类型并标准化代码
 
     Args:
-        code: 股票代码
+        code: 股票/加密货币代码
 
     Returns:
         (market, normalized_code): 市场类型和标准化后的代码
             - CN: A股（6位数字）
             - HK: 港股（4-5位数字或带.HK后缀）
-            - US: 美股（字母代码）
+            - US: 美股（字母代码，4-5位）
+            - CRYPTO: 加密货币（2-4位大写字母，白名单）
     """
     code = code.strip().upper()
+
+    # 加密货币：2-4位大写字母，且在provider支持列表中
+    if re.match(r'^[A-Z]{2,4}$', code):
+        try:
+            from tradingagents.dataflows.providers.crypto import CRYPTO_SYMBOL_MAPPING
+            if code in CRYPTO_SYMBOL_MAPPING:
+                return ('CRYPTO', code)
+        except Exception:
+            pass
 
     # 港股：带.HK后缀
     if code.endswith('.HK'):
         return ('HK', code[:-3].zfill(5))  # 移除.HK，补齐到5位
 
-    # 美股：纯字母
-    if re.match(r'^[A-Z]+$', code):
+    # 美股：4-5位大写字母（排除加密货币）
+    if re.match(r'^[A-Z]{4,5}$', code):
         return ('US', code)
 
     # 港股：4-5位数字
@@ -70,15 +80,16 @@ async def get_quote(
     current_user: dict = Depends(get_current_user)
 ):
     """
-    获取股票实时行情（支持A股/港股/美股）
+    获取股票/加密货币实时行情（支持A股/港股/美股/加密货币）
 
     自动识别市场类型：
     - 6位数字 → A股
     - 4位数字或.HK → 港股
-    - 纯字母 → 美股
+    - 4-5位字母（非加密货币）→ 美股
+    - 2-4位字母（加密货币白名单）→ 加密货币
 
     参数：
-    - code: 股票代码
+    - code: 股票/加密货币代码
     - force_refresh: 是否强制刷新（跳过缓存）
 
     返回字段（data内，蛇形命名）:
@@ -90,22 +101,43 @@ async def get_quote(
     # 检测市场类型
     market, normalized_code = _detect_market_and_code(code)
 
-    # 港股和美股：使用新服务
-    if market in ['HK', 'US']:
+    # 港股、美股、加密货币：统一使用 ForeignStockService
+    if market in ['HK', 'US', 'CRYPTO']:
         from app.services.foreign_stock_service import ForeignStockService
 
         db = get_mongo_db()  # 不需要 await，直接返回数据库对象
         service = ForeignStockService(db=db)
 
         try:
-            quote = await service.get_quote(market, normalized_code, force_refresh)
-            return ok(data=quote)
+            result = await service.get_quote(market, normalized_code, force_refresh)
+
+            if result:
+                # 统一数据格式化
+                market_type_map = {
+                    'HK': '港股',
+                    'US': '美股',
+                    'CRYPTO': '加密货币'
+                }
+
+                return ok(data={
+                    "code": normalized_code,
+                    "name": result.get("name") or result.get("symbol", normalized_code),
+                    "market": market,
+                    "market_type": market_type_map.get(market, "未知"),
+                    "price": result.get("close") or result.get("current_price"),
+                    "change_percent": result.get("pct_chg") or result.get("price_change_24h"),
+                    "amount": result.get("amount") or result.get("volume") or result.get("total_volume"),
+                    "prev_close": result.get("pre_close"),
+                    "trade_date": result.get("trade_date") or result.get("date"),
+                    "updated_at": result.get("updated_at") or result.get("timestamp")
+                })
+            else:
+                market_type_name = "加密货币" if market == "CRYPTO" else (market if market in ["HK", "US"] else "未知")
+                return ok(data=None, message=f"未找到{market_type_name}行情数据")
+
         except Exception as e:
-            logger.error(f"获取{market}股票{code}行情失败: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"获取行情失败: {str(e)}"
-            )
+            logger.error(f"获取{market}行情失败: {e}")
+            return ok(data=None, message=f"获取{market}行情失败: {str(e)}")
 
     # A股：使用现有逻辑
     db = get_mongo_db()
@@ -234,8 +266,8 @@ async def get_fundamentals(
     # 检测市场类型
     market, normalized_code = _detect_market_and_code(code)
 
-    # 港股和美股：使用新服务
-    if market in ['HK', 'US']:
+    # 港股、美股、加密货币：统一使用 ForeignStockService
+    if market in ['HK', 'US', 'CRYPTO']:
         from app.services.foreign_stock_service import ForeignStockService
 
         db = get_mongo_db()  # 不需要 await，直接返回数据库对象
@@ -245,11 +277,8 @@ async def get_fundamentals(
             info = await service.get_basic_info(market, normalized_code, force_refresh)
             return ok(data=info)
         except Exception as e:
-            logger.error(f"获取{market}股票{code}基础信息失败: {e}")
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"获取基础信息失败: {str(e)}"
-            )
+            logger.error(f"获取{market}基础信息失败: {e}")
+            return ok(data=None, message=f"获取基础信息失败: {str(e)}")
 
     # A股：使用现有逻辑
     db = get_mongo_db()

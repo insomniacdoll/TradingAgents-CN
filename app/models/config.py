@@ -164,6 +164,9 @@ class DataSourceType(str, Enum):
     ALPHA_VANTAGE = "alpha_vantage"
     IEX_CLOUD = "iex_cloud"
 
+    # 加密货币数据源
+    COINGECKO = "coingecko"
+
     # 专业数据源
     WIND = "wind"
     CHOICE = "choice"

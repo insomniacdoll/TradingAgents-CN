@@ -19,10 +19,10 @@ def to_str_id(v: Any) -> str:
 
 
 # 枚举类型定义
-MarketType = Literal["CN", "HK", "US"]  # 市场类型
-ExchangeType = Literal["SZSE", "SSE", "SEHK", "NYSE", "NASDAQ"]  # 交易所
+MarketType = Literal["CN", "HK", "US", "CRYPTO"]  # 市场类型
+ExchangeType = Literal["SZSE", "SSE", "SEHK", "NYSE", "NASDAQ", "COINGECKO"]  # 交易所
 StockStatus = Literal["L", "D", "P"]  # 上市状态: L-上市 D-退市 P-暂停
-CurrencyType = Literal["CNY", "HKD", "USD"]  # 货币类型
+CurrencyType = Literal["CNY", "HKD", "USD", "USDT", "BTC", "ETH"]  # 货币类型
 
 
 class MarketInfo(BaseModel):
@@ -57,7 +57,7 @@ class StockBasicInfoExtended(BaseModel):
     统一使用 symbol 作为主要股票代码字段
     """
     # === 标准化字段 (主要字段) ===
-    symbol: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    symbol: str = Field(..., description="股票/加密货币代码")
     full_symbol: str = Field(..., description="完整标准化代码(如 000001.SZ)")
     name: str = Field(..., description="股票名称")
 
@@ -156,7 +156,7 @@ class MarketQuotesExtended(BaseModel):
     统一使用 symbol 作为主要股票代码字段
     """
     # === 标准化字段 (主要字段) ===
-    symbol: str = Field(..., description="6位股票代码", pattern=r"^\d{6}$")
+    symbol: str = Field(..., description="股票/加密货币代码")
     full_symbol: Optional[str] = Field(None, description="完整标准化代码")
     market: Optional[MarketType] = Field(None, description="市场标识")
 

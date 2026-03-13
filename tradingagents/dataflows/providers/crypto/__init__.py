@@ -4,13 +4,15 @@
 """
 
 try:
-    from .crypto_provider import CryptoProvider
+    from .crypto_provider import CryptoProvider, CRYPTO_SYMBOL_MAPPING
     CRYPTO_PROVIDER_AVAILABLE = True
 except ImportError:
     CryptoProvider = None
+    CRYPTO_SYMBOL_MAPPING = None
     CRYPTO_PROVIDER_AVAILABLE = False
 
 __all__ = [
     'CryptoProvider',
+    'CRYPTO_SYMBOL_MAPPING',
     'CRYPTO_PROVIDER_AVAILABLE',
 ]

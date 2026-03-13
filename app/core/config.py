@@ -270,6 +270,13 @@ class Settings(BaseSettings):
     US_DATA_CACHE_HOURS: int = Field(default=24, ge=1, le=168, description="美股数据缓存时长（小时）")
     US_DEFAULT_DATA_SOURCE: str = Field(default="yfinance", description="美股默认数据源（yfinance/finnhub）")
 
+    # ==================== 加密货币数据配置 ====================
+
+    # CoinGecko API配置
+    COINGECKO_API_KEY: str = Field(default="", description="CoinGecko API密钥（可选，付费账户）")
+    CRYPTO_DATA_SOURCE_ENABLED: bool = Field(default=True, description="加密货币数据源启用状态")
+    CRYPTO_DATA_CACHE_HOURS: int = Field(default=24, ge=1, le=168, description="加密货币数据缓存时长（小时）")
+
     # ===== 新闻数据同步服务配置 =====
     NEWS_SYNC_ENABLED: bool = Field(default=True)
     NEWS_SYNC_CRON: str = Field(default="0 */2 * * *")  # 每2小时
