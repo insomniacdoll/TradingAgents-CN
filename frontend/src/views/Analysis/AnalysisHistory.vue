@@ -32,6 +32,7 @@
             <el-option label="美股" value="美股" />
             <el-option label="A股" value="A股" />
             <el-option label="港股" value="港股" />
+            <el-option label="加密货币" value="加密货币" />
           </el-select>
         </el-form-item>
 

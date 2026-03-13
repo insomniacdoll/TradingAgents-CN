@@ -50,7 +50,7 @@
                   v-model="stockInput"
                   type="textarea"
                   :rows="8"
-                  placeholder="请输入股票代码，每行一个&#10;支持格式：&#10;000001&#10;000002.SZ&#10;600036.SH&#10;AAPL&#10;TSLA"
+                  placeholder="请输入股票代码，每行一个&#10;支持格式：&#10;000001&#10;000002.SZ&#10;600036.SH&#10;AAPL&#10;TSLA&#10;BTC&#10;ETH"
                   @input="parseStockCodes"
                   class="stock-textarea"
                 />

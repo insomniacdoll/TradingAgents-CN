@@ -1,4 +1,4 @@
-// 市场参数规范化：将各类板块/交易所/缩写统一为分析模块支持的 A股/美股/港股
+// 市场参数规范化：将各类板块/交易所/缩写统一为分析模块支持的 A股/美股/港股/加密货币
 export const normalizeMarketForAnalysis = (market: any): string => {
   const raw = String(market ?? '').trim()
   const upper = raw.toUpperCase()
@@ -8,9 +8,11 @@ export const normalizeMarketForAnalysis = (market: any): string => {
   ].includes(cn) || ['CN', 'SH', 'SZ', 'SSE', 'SZSE'].includes(upper)
   const isHK = ['港股', '港交所'].includes(cn) || ['HK', 'HKEX'].includes(upper)
   const isUS = ['美股', '纳斯达克', '纽交所'].includes(cn) || ['US', 'NASDAQ', 'NYSE', 'AMEX'].includes(upper)
+  const isCrypto = ['加密货币', 'CRYPTO', '数字货币'].includes(cn) || ['CRYPTO'].includes(upper)
   if (isA) return 'A股'
   if (isHK) return '港股'
   if (isUS) return '美股'
+  if (isCrypto) return '加密货币'
   // 默认按A股处理
   return 'A股'
 }
@@ -18,7 +20,7 @@ export const normalizeMarketForAnalysis = (market: any): string => {
 /**
  * 将交易所代码转换为市场类型
  * @param exchangeCode 交易所代码（如 "sz", "sh", "hk", "us"）
- * @returns 市场类型（"A股", "港股", "美股"）
+ * @returns 市场类型（"A股", "港股", "美股", "加密货币"）
  */
 export const exchangeCodeToMarket = (exchangeCode: string): string => {
   const code = String(exchangeCode ?? '').toLowerCase().trim()
@@ -38,6 +40,11 @@ export const exchangeCodeToMarket = (exchangeCode: string): string => {
     return '美股'
   }
 
+  // 加密货币交易所代码
+  if (['crypto', 'binance', 'coinbase', 'okx', 'bybit'].includes(code)) {
+    return '加密货币'
+  }
+
   // 默认返回A股
   return 'A股'
 }
@@ -45,7 +52,7 @@ export const exchangeCodeToMarket = (exchangeCode: string): string => {
 /**
  * 根据股票代码判断市场类型
  * @param stockCode 股票代码
- * @returns 市场类型（"A股", "港股", "美股"）
+ * @returns 市场类型（"A股", "港股", "美股", "加密货币"）
  */
 export const getMarketByStockCode = (stockCode: string): string => {
   const code = String(stockCode ?? '').trim().toUpperCase()
@@ -66,7 +73,16 @@ export const getMarketByStockCode = (stockCode: string): string => {
     return '港股'
   }
 
-  // 美股：纯字母（至少1个字母）
+  // 加密货币：2-4个字母且在白名单中
+  if (/^[A-Z]{2,4}$/.test(code)) {
+    const commonCryptos = ['BTC', 'ETH', 'ADA', 'SOL', 'DOT', 'AVAX', 'MATIC', 'LINK', 'UNI', 'AAVE',
+                           'XRP', 'LTC', 'BCH', 'DOGE', 'SHIB', 'PEPE', 'FLOKI', 'BNB', 'USDT', 'USDC']
+    if (commonCryptos.includes(code)) {
+      return '加密货币'
+    }
+  }
+
+  // 美股：纯字母
   if (/^[A-Z]+$/.test(code)) {
     return '美股'
   }
